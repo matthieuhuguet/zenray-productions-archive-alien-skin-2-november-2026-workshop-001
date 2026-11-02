@@ -1,0 +1,78 @@
+# 2 November 2026 : quick numpy lit preview of the maps next to the reference panels: relief shading, cast shadows along the light, wide occlusion. 2 seconds instead of a render.
+# FR : aperçu éclairé rapide des cartes à côté des panneaux de référence : ombrage, ombres portées, occlusion large ; 2 secondes au lieu d'un rendu.
+import json
+import sys
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+ROOT = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+SIZE = 1024
+DEPTH_PX = 0.08 * 1024 * SIZE / 2048   # relief 8 cm on a 2 m tile, in pixels of this preview
+ELEV = np.radians(38)
+AZIM = np.radians(115)                 # light from the upper left, image coordinates
+LIGHT = np.array([np.cos(ELEV) * np.cos(AZIM), np.cos(ELEV) * np.sin(AZIM), np.sin(ELEV)])
+
+
+def load(p, mode=None):
+    im = Image.open(p)
+    if mode:
+        im = im.convert(mode)
+    if im.size[0] != SIZE:
+        im = im.resize((SIZE, SIZE), Image.LANCZOS)
+    a = np.asarray(im, np.float64)
+    return a / (65535.0 if a.max() > 255 else 255.0)
+
+
+def normals(h):
+    z = h * DEPTH_PX
+    gx = (np.roll(z, -1, 1) - np.roll(z, 1, 1)) * 0.5
+    gy = (np.roll(z, -1, 0) - np.roll(z, 1, 0)) * 0.5
+    n = np.dstack([-gx, gy, np.ones_like(z)])
+    return n / np.linalg.norm(n, axis=2, keepdims=True)
+
+
+def cast_shadow(h):
+    z = h * DEPTH_PX
+    dirx, diry = np.cos(AZIM), -np.sin(AZIM)
+    slope = np.tan(ELEV)
+    lit = np.ones_like(z)
+    for k in np.arange(2, 96, 2):
+        over = np.roll(np.roll(z, -int(round(diry * k)), 0), -int(round(dirx * k)), 1) - (z + k * slope)
+        lit = np.minimum(lit, np.clip(1.0 - over / 2.0, 0.0, 1.0))
+    return ndi.gaussian_filter(lit, 0.8, mode="wrap")
+
+
+def shade(bc, h, ao, rough, sh, n):
+    diff = np.clip((n * LIGHT).sum(2), 0, 1) * sh
+    half = LIGHT + np.array([0, 0, 1.0])
+    half = half / np.linalg.norm(half)
+    power = np.minimum(2.0 / np.maximum(rough ** 4, 1e-3), 300.0)
+    spec = np.clip((n * half).sum(2), 0, 1) ** power * (1.0 - rough) * sh * 0.6
+    lin = np.clip(bc, 0, 1) ** 2.2
+    out = lin * (0.28 * ao + 1.25 * diff)[..., None] + spec[..., None]
+    return np.clip(out, 0, 1) ** (1 / 2.2)
+
+
+def main():
+    h = load(ROOT + "maps/T_AlienSkin_Height.png")
+    ao = load(ROOT + "maps/T_AlienSkin_AO.png", "L")
+    rough = load(ROOT + "maps/T_AlienSkin_Roughness.png", "L")
+    n = normals(ndi.gaussian_filter(h, 1.0, mode="wrap"))
+    sh = cast_shadow(h)
+    size = 640
+    panels = Image.open(ROOT + "Sources/colourways_3panels.webp").convert("RGB")
+    boxes = json.load(open(ROOT + "basecolor/panel_boxes.json"))
+    sheet = Image.new("RGB", (size * 3, size * 2), (24, 24, 24))
+    for i, (name, ref) in enumerate((("grey_stone", "stone"), ("clay_red", "red"), ("moss_green", "green"))):
+        bc = load(ROOT + f"basecolor/bc_{name}.png", "RGB")
+        r = shade(bc, h, ao, rough, sh, n)
+        sheet.paste(panels.crop(tuple(boxes[ref]["box"])).resize((size, size), Image.LANCZOS), (i * size, 0))
+        sheet.paste(Image.fromarray((r * 255).astype(np.uint8)).resize((size, size), Image.LANCZOS), (i * size, size))
+    sheet.save(ROOT + "basecolor/compare_ref_vs_maps.png")
+    print("saved")
+
+
+if __name__ == "__main__":
+    main()

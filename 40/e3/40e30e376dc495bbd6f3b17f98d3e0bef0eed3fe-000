@@ -1,0 +1,25 @@
+# 2 November 2026 : the five maps on AlienSkinRef, moss green by default, and the three colourways for the comparison with the reference.
+# FR : les cinq cartes sur AlienSkinRef, vert par défaut, et les trois palettes pour la comparaison avec la référence.
+import json
+import subprocess
+
+BC = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/basecolor"
+MAPS = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps"
+code = f"""
+import hou
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightToProceduralColorCop.py').read(), g)
+net_path = '/obj/ZRH_AlienSkinRef'
+info = g['build'](net_path)
+net = hou.node(net_path)
+for name in g['PRESET_ORDER']:
+    g['apply_preset'](net, name)
+    g['export_one'](net_path, 'PBC_OUT', '{BC}/bc_' + name + '.png')
+g['apply_preset'](net, g['DEFAULT_PRESET'])
+g['export_one'](net_path, 'PBC_mask_patina', '{BC}/mask_patina.png')
+maps = g['build_maps'](net_path, '{MAPS}', 'T_AlienSkin')
+errs = [n.name() + ': ' + ';'.join(n.errors()) for n in net.children() if n.errors()]
+result = {{'pbc': info, 'maps': maps, 'errors': errs}}
+"""
+o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=280)
+print(o.stdout[-1500:], o.stderr[-300:])

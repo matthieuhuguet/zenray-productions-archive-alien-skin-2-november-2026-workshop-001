@@ -1,0 +1,23 @@
+# 2 November 2026 : build the procedural base color on AlienSkinRef and export the three colourways.
+# FR : construit la base color procédurale sur AlienSkinRef et exporte les trois palettes.
+import json
+import subprocess
+import sys
+
+OUT = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/basecolor"
+code = f"""
+import hou
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightToProceduralColorCop.py').read(), g)
+info = g['build']('/obj/ZRH_AlienSkinRef')
+files = {{}}
+net = hou.node('/obj/ZRH_AlienSkinRef')
+for name in g['PRESET_ORDER']:
+    g['apply_preset'](net, name)
+    files[name] = g['export_one']('/obj/ZRH_AlienSkinRef', 'PBC_OUT', '{OUT}/bc_' + name + '.png')
+g['apply_preset'](net, g['DEFAULT_PRESET'])
+g['export_one']('/obj/ZRH_AlienSkinRef', 'PBC_mask_patina', '{OUT}/mask_patina.png')
+result = {{'info': info, 'files': files, 'parms': [p.name() for p in net.parms() if p.name().startswith(('stone', 'patina', 'preset', 'hue'))][:10]}}
+"""
+o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=240)
+print(o.stdout[-1500:], o.stderr[-300:])
