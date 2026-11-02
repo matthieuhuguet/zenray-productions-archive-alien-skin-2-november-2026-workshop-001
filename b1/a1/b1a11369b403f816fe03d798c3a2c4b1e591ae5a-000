@@ -1,0 +1,70 @@
+{
+ "log": [
+  {
+   "level": "start",
+   "explained": 0.6391035694987709
+  },
+  {
+   "block": 128,
+   "round": 0,
+   "explained": 0.6570528359580414,
+   "kept": true
+  },
+  {
+   "block": 128,
+   "round": 1,
+   "explained": 0.6627653152232366,
+   "kept": true
+  },
+  {
+   "block": 64,
+   "round": 0,
+   "explained": 0.6679248589478565,
+   "kept": true
+  },
+  {
+   "block": 64,
+   "round": 1,
+   "explained": 0.6696680417318548,
+   "kept": true
+  },
+  {
+   "block": 48,
+   "round": 0,
+   "explained": 0.6723739167522053,
+   "kept": true
+  },
+  {
+   "block": 48,
+   "round": 1,
+   "explained": 0.6735036900468712,
+   "kept": true
+  },
+  {
+   "block": 32,
+   "round": 0,
+   "explained": 0.6772387863988724,
+   "kept": true
+  },
+  {
+   "block": 32,
+   "round": 1,
+   "explained": 0.6796451382679979,
+   "kept": true
+  },
+  {
+   "block": 24,
+   "round": 0,
+   "explained": 0.6834617851199273,
+   "kept": true
+  },
+  {
+   "block": 24,
+   "round": 1,
+   "explained": 0.6863773457217048,
+   "kept": true
+  }
+ ],
+ "explained": 0.6863773457217048,
+ "plan_vs_graph_height": 0.9999858115101623
+}

@@ -1,0 +1,82 @@
+{
+ "log": [
+  {
+   "level": "start",
+   "explained_as_given": 0.29943100827490127,
+   "explained": 0.45178684772453537
+  },
+  {
+   "block": 256,
+   "round": 0,
+   "explained": 0.5689240329819675,
+   "kept": true
+  },
+  {
+   "block": 256,
+   "round": 1,
+   "explained": 0.6088042270815638,
+   "kept": true
+  },
+  {
+   "block": 128,
+   "round": 0,
+   "explained": 0.6671123934644645,
+   "kept": true
+  },
+  {
+   "block": 128,
+   "round": 1,
+   "explained": 0.6856600692334943,
+   "kept": true
+  },
+  {
+   "block": 64,
+   "round": 0,
+   "explained": 0.7155251150189469,
+   "kept": true
+  },
+  {
+   "block": 64,
+   "round": 1,
+   "explained": 0.7312371080991745,
+   "kept": true
+  },
+  {
+   "block": 48,
+   "round": 0,
+   "explained": 0.7431393607595824,
+   "kept": true
+  },
+  {
+   "block": 48,
+   "round": 1,
+   "explained": 0.75021740481231,
+   "kept": true
+  },
+  {
+   "block": 32,
+   "round": 0,
+   "explained": 0.7587801132666487,
+   "kept": true
+  },
+  {
+   "block": 32,
+   "round": 1,
+   "explained": 0.7647240511871048,
+   "kept": true
+  },
+  {
+   "block": 24,
+   "round": 0,
+   "explained": 0.7705514661725333,
+   "kept": true
+  },
+  {
+   "block": 24,
+   "round": 1,
+   "explained": 0.7749440094948792,
+   "kept": true
+  }
+ ],
+ "explained": 0.7749440094948792
+}
