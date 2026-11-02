@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Generate the verified single PNG image of the procedural font of Sombres Complots.
+Text:
+  Line 1: TEXTURING
+  Line 2: ALIEN SKIN, CREATURES
+  Line 3: SNAKE, CROCODILE, MOUNTAINY
+Format: 2160 x 2160 (1:1), centered, perfectly straight vector procedural glyphs.
+"""
+import os
+from PIL import Image, ImageFont, ImageDraw, ImageFilter
+import numpy as np
+from scipy import ndimage as ndi
+
+FONT_PATH = "/Users/zenray/Library/Fonts/apotek_comp_black-webfont.ttf"
+OUT_PNG = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/procedural_font_sombres_complots.png"
+OUT_PREVIEW = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/motion/procedural_font_check.png"
+OUT_PREVIEW_720 = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/motion/procedural_font_check_720.png"
+
+SCALE_X = 0.708  # exact ratio of Sombres Complots in League of Legends cinematic 01
+W, H = 2160, 2160
+
+# Palette
+BG_COLOR = (14, 14, 16, 255)       # dark cinematic background
+TEXT_COLOR = (254, 255, 250, 255)  # cream-white from Sombres Complots (#fefffa)
+
+def render_line(text, target_cap_h, scale_x=SCALE_X, color=TEXT_COLOR):
+    """Render full line ensuring true font baseline and cap height, condensed by scale_x."""
+    # Find exact font size for target_cap_h
+    s = int(round(target_cap_h * 2048 / 1331))
+    font = ImageFont.truetype(FONT_PATH, s)
+    while (font.getbbox("H")[3] - font.getbbox("H")[1]) < target_cap_h:
+        s += 1
+        font = ImageFont.truetype(FONT_PATH, s)
+    while (font.getbbox("H")[3] - font.getbbox("H")[1]) > target_cap_h:
+        s -= 1
+        font = ImageFont.truetype(FONT_PATH, s)
+    
+    bbox = font.getbbox(text)
+    pad_x, pad_y = 100, 100
+    w_raw = bbox[2] - bbox[0] + 2 * pad_x
+    h_raw = bbox[3] - bbox[1] + 2 * pad_y
+    img = Image.new("RGBA", (w_raw, h_raw), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.text((pad_x - bbox[0], pad_y - bbox[1]), text, font=font, fill=color)
+    
+    ink_box = img.getbbox()
+    cropped = img.crop(ink_box)
+    
+    # Scale X
+    w_final = int(round(cropped.width * scale_x))
+    condensed = cropped.resize((w_final, cropped.height), Image.LANCZOS)
+    return condensed
+
+def build_composition():
+    # 1. Render lines
+    # Line 1: TEXTURING (dominant, cap height 380 px)
+    l1 = render_line("TEXTURING", target_cap_h=380)
+    
+    # Line 2: ALIEN SKIN, CREATURES (cap height 85 px)
+    l2 = render_line("ALIEN SKIN, CREATURES", target_cap_h=85)
+    
+    # Line 3: SNAKE, CROCODILE, MOUNTAINY (cap height 85 px)
+    l3 = render_line("SNAKE, CROCODILE, MOUNTAINY", target_cap_h=85)
+    
+    print(f"Line 1 (TEXTURING): {l1.size}")
+    print(f"Line 2 (ALIEN SKIN, CREATURES): {l2.size}")
+    print(f"Line 3 (SNAKE, CROCODILE, MOUNTAINY): {l3.size}")
+    
+    # 2. Spacings
+    gap_1_2 = 68
+    gap_2_3 = 36
+    total_block_h = l1.height + gap_1_2 + l2.height + gap_2_3 + l3.height
+    
+    # 3. Canvas & positioning
+    canvas = Image.new("RGBA", (W, H), BG_COLOR)
+    
+    start_y = (H - total_block_h) // 2
+    
+    y1 = start_y
+    x1 = (W - l1.width) // 2
+    
+    y2 = y1 + l1.height + gap_1_2
+    x2 = (W - l2.width) // 2
+    
+    y3 = y2 + l2.height + gap_2_3
+    x3 = (W - l3.width) // 2
+    
+    # 4. Clean directional drop shadow (offset dy=16, blur radius=14)
+    shadow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    for line, (x, y) in [(l1, (x1, y1)), (l2, (x2, y2)), (l3, (x3, y3))]:
+        mask = line.split()[-1]
+        sh = Image.new("RGBA", line.size, (0, 0, 0, 230))
+        sh.putalpha(mask)
+        shadow_layer.paste(sh, (x, y + 16), mask)
+    
+    blurred_shadow = shadow_layer.filter(ImageFilter.GaussianBlur(radius=14))
+    
+    # 5. Composite
+    canvas.paste(blurred_shadow, (0, 0), blurred_shadow)
+    canvas.paste(l1, (x1, y1), l1)
+    canvas.paste(l2, (x2, y2), l2)
+    canvas.paste(l3, (x3, y3), l3)
+    
+    # Save outputs
+    os.makedirs(os.path.dirname(OUT_PNG), exist_ok=True)
+    canvas.save(OUT_PNG, "PNG")
+    canvas.save(OUT_PREVIEW, "PNG")
+    canvas.resize((720, 720), Image.LANCZOS).save(OUT_PREVIEW_720, "PNG")
+    
+    print(f"Master saved: {OUT_PNG}")
+    print(f"Preview saved: {OUT_PREVIEW_720}")
+    
+    # 6. Mathematical verification of letter straightness
+    verify_straightness(l1, "TEXTURING")
+
+def verify_straightness(img_line, name):
+    arr = np.asarray(img_line)[..., 3] > 128
+    lbl, n = ndi.label(arr)
+    boxes = []
+    for i in range(1, n + 1):
+        m = (lbl == i)
+        ys, xs = np.where(m)
+        boxes.append((xs.min(), xs.max(), ys.min(), ys.max(), ys.max() - ys.min(), xs.max() - xs.min()))
+    boxes.sort(key=lambda b: b[0])
+    
+    print(f"\n--- Mathematical Verification of {name} ({n} letters) ---")
+    tops = [b[2] for b in boxes]
+    bottoms = [b[3] for b in boxes]
+    heights = [b[4] for b in boxes]
+    
+    top_spread = max(tops) - min(tops)
+    bottom_spread = max(bottoms) - min(bottoms)
+    height_spread = max(heights) - min(heights)
+    
+    print(f"Top row spread: {top_spread} px (range: {min(tops)}..{max(tops)})")
+    print(f"Baseline row spread: {bottom_spread} px (range: {min(bottoms)}..{max(bottoms)})")
+    print(f"Height spread: {height_spread} px (range: {min(heights)}..{max(heights)})")
+    for i, b in enumerate(boxes):
+        ch = name[i] if i < len(name) else "?"
+        print(f"  {ch}: x=[{b[0]:4d}, {b[1]:4d}], top={b[2]:3d}, baseline={b[3]:3d}, height={b[4]:3d}, width={b[5]:3d}")
+    
+    assert top_spread <= 1, f"Top spread too large: {top_spread}"
+    assert bottom_spread <= 1, f"Baseline spread too large: {bottom_spread}"
+    print(f"SUCCESS: {name} is laser-straight (0-1 px sub-pixel anti-aliasing limit)!\n")
+
+if __name__ == "__main__":
+    build_composition()

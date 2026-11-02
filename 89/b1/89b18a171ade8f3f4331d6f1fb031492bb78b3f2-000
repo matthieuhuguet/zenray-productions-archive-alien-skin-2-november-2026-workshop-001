@@ -1,0 +1,42 @@
+{
+ "date": "02 November 2026 18:58",
+ "graph": "/obj/ZRH_AlienSkinRef",
+ "stem": "T_AlienSkin",
+ "params": {
+  "prefix": "T5_",
+  "height": "SK_h",
+  "basecolor": "SK_BaseColor",
+  "px_per_m": 1024.0,
+  "relief_depth_m": 0.1,
+  "normal_kernel": 1,
+  "normal_read_outside": 1,
+  "ao_radius_px": 32.0,
+  "ao_samples": 24,
+  "rough_base": 0.44,
+  "rough_ao": 0.22,
+  "rough_lum": 0.3,
+  "rough_lum_ref": 0.45,
+  "metallic": 0.0,
+  "rough_mask": "SK_green",
+  "rough_mask_gain": 0.25,
+  "res": 2048,
+  "box_color": [
+   0.35,
+   0.5,
+   0.35
+  ],
+  "dx": 40.0,
+  "dy": 1.3
+ },
+ "normal_scale": 0.1,
+ "ao_heightscale": 102.4,
+ "files": {
+  "BaseColor": "T_AlienSkin_BaseColor.png",
+  "Normal": "T_AlienSkin_Normal.png",
+  "Height": "T_AlienSkin_Height.png",
+  "Roughness": "T_AlienSkin_Roughness.png",
+  "AO": "T_AlienSkin_AO.png",
+  "Metallic": "T_AlienSkin_Metallic.png",
+  "ORM": "T_AlienSkin_ORM.png"
+ }
+}

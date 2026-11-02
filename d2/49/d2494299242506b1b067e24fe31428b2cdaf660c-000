@@ -1,0 +1,62 @@
+{
+ "params": {
+  "levels": [
+   [
+    128,
+    64,
+    40,
+    0.4,
+    2.0
+   ],
+   [
+    64,
+    32,
+    14,
+    0.45,
+    1.5
+   ],
+   [
+    40,
+    20,
+    7,
+    0.45,
+    1.2
+   ],
+   [
+    24,
+    12,
+    4,
+    0.5,
+    1.0
+   ]
+  ],
+  "work": 1024,
+  "out": 2048
+ },
+ "log": [
+  {
+   "block": 128,
+   "median_ncc": 0.623,
+   "corr_after": 0.4112,
+   "max_field": 27.1
+  },
+  {
+   "block": 64,
+   "median_ncc": 0.686,
+   "corr_after": 0.5242,
+   "max_field": 33.0
+  },
+  {
+   "block": 40,
+   "median_ncc": 0.71,
+   "corr_after": 0.5869,
+   "max_field": 35.9
+  },
+  {
+   "block": 24,
+   "median_ncc": 0.744,
+   "corr_after": 0.6323,
+   "max_field": 36.7
+  }
+ ]
+}

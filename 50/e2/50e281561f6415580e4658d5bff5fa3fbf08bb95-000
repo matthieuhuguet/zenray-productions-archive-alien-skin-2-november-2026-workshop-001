@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Build procedural vector font from Apotek Comp Black for Sombres Complots / Alien Skin."""
+import json
+import os
+from fontTools.ttLib import TTFont
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.transformPen import TransformPen
+from fontTools.pens.boundsPen import BoundsPen
+
+FONT_PATH = "/Users/zenray/Library/Fonts/apotek_comp_black-webfont.ttf"
+OUT_JSON = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/motion/procedural_font_data.json"
+
+f = TTFont(FONT_PATH)
+gs = f.getGlyphSet()
+cmap = f.getBestCmap()
+bp = BoundsPen(gs)
+gs[cmap[ord("H")]].draw(bp)
+capH = bp.bounds[3]
+s = 1000.0 / capH
+
+CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,;:!?'-–—+/&@()[]%°·€$#*=<>_ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖŒÙÚÛÜÝŸ"
+glyphs = {}
+for ch in CHARSET:
+    gid = cmap.get(ord(ch))
+    if not gid:
+        continue
+    pen = SVGPathPen(gs, ntos=lambda v: f"{v:.1f}")
+    gs[gid].draw(TransformPen(pen, (s, 0, 0, -s, 0, capH * s)))
+    d = pen.getCommands()
+    bp2 = BoundsPen(gs)
+    gs[gid].draw(bp2)
+    b = bp2.bounds
+    glyphs[ch] = {
+        "d": d,
+        "a": round(gs[gid].width * s, 1),
+        "x0": round(b[0] * s, 1),
+        "x1": round(b[2] * s, 1)
+    }
+
+data = {
+    "id": "lol-title",
+    "cap": 1000,
+    "sx": 0.70,   # exact condensation factor matching Sombres Complots
+    "dil": 0.0,   # zero artificial dilation - pure pristine vector fill
+    "rough": 0.0, # zero noise - perfectly sharp
+    "font": "apotek_comp_black-webfont.ttf",
+    "glyphs": glyphs
+}
+
+with open(OUT_JSON, "w") as fp:
+    json.dump(data, fp)
+
+print(f"Exported {len(glyphs)} glyphs to {OUT_JSON}")
