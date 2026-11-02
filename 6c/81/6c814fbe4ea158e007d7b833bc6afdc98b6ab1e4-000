@@ -1,0 +1,85 @@
+# 2 November 2026 : the five maps of one or more colourways from the graph, then Karma on a sphere and a plane, one render after the other, next to the reference on the same olive ground.
+# Usage : python -I RunColorways.py green,red,grey [variant] [--relink] [key=value for the look]. FR : les cinq cartes de chaque coloris depuis le graphe, puis Karma sur une sphère et un plan.
+import json
+import os
+import subprocess
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+NET = "/obj/ZRH_AlienSkinRef"
+MAPS = "/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py"
+LOOKDEV = "/Users/zenray/.claude/skills/zenray-houdini/scripts/height/LookDevMaps.py"
+os.environ.setdefault("ZR_BRIDGE_TIMEOUT", "600")
+GROUND = (66, 66, 46)   # the olive of the reference. FR : l'olive de la référence.
+LOOK = dict(sphere_repeat=(2.0, 1.0), disp_map="Displace", normal_map="NormalDetail", use_normal=True, disp_offset=-0.37, disp_scale=0.17,
+            sun_rotate=(-42.0, -25.0, 0.0), sun_intensity=5.0, dome_intensity=0.3, reflect=1.0, coat=0.6, coat_rough=0.3, cam_pos=(-0.05, 0.0, 12.5), res=(1600, 800), samples=32)
+
+
+def hom(code):
+    o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=700)
+    d = json.loads(o.stdout)
+    if not d.get("ok"):
+        raise SystemExit(str(d)[:1500])
+    return d.get("result")
+
+
+def render(maps_dir, png, look):
+    hom(f"""
+g = {{}}
+exec(open('{LOOKDEV}').read(), g)
+result = g['build']('{maps_dir}', 'T_AlienSkin', '{png}', **{look!r})
+""")
+    t0 = time.time()
+    last = -1
+    while time.time() - t0 < 900:
+        if os.path.exists(png):
+            s = os.path.getsize(png)
+            if s == last and s > 0:
+                return round(time.time() - t0)
+            last = s
+        time.sleep(3)
+    raise SystemExit("render timed out " + png)
+
+
+def on_ground(png):
+    im = Image.open(png).convert("RGBA")
+    bg = Image.new("RGBA", im.size, GROUND + (255,))
+    return Image.alpha_composite(bg, im).convert("RGB")
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    ways = args[0].split(",")
+    plain = [x for x in args[1:] if "=" not in x and not x.startswith("--")]
+    variant = plain[0] if plain else "mid"
+    look = dict(LOOK)
+    for kv in (x for x in args[1:] if "=" in x):
+        k, v = kv.split("=", 1)
+        look[k] = json.loads(v)
+    if "--relink" in args:
+        print(hom(f"""
+import hou
+g = {{}}
+exec(open('{MAPS}').read(), g)
+net = hou.node('{NET}')
+g['skin_controls'](net, '{variant}')
+result = g['skin_link']('{NET}', 'HBC_OUT', 'OUT_height', '/obj/ZRH_AlienSkinRef_Lines/OUT_height', own=('HBS_OUT', '/obj/ZRH_AlienSkinRef_LinesSnake/OUT_height'))
+"""), flush=True)
+    for w in ways:
+        out = f"{A}maps_{w}"
+        t0 = time.time()
+        r = hom(f"""
+g = {{}}
+exec(open('{MAPS}').read(), g)
+info = g['skin_maps']('{NET}', '{out}', 'T_AlienSkin', '{variant}', '{w}')
+result = {{'ok': info['ok'], 'errors': info['errors'], 'normal': info['normal_scale']}}
+""")
+        print(w, "maps", r, round(time.time() - t0), "s", flush=True)
+        png = f"{A}render/skin_{w}.png"
+        print(w, "render", render(out, png, look), "s", flush=True)
+        on_ground(png).save(f"{A}render/skin_{w}_on_ground.png")
+    print("done", flush=True)

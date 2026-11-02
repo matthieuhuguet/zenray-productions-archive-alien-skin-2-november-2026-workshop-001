@@ -1,0 +1,12 @@
+start 0.6391
+128 0 explained 0.6571 field max 3.7 median 1.93 kept
+128 1 explained 0.6628 field max 5.5 median 3.0 kept
+64 0 explained 0.6679 field max 7.2 median 3.6 kept
+64 1 explained 0.6697 field max 8.7 median 4.0 kept
+48 0 explained 0.6724 field max 8.7 median 4.26 kept
+48 1 explained 0.6735 field max 10.3 median 4.47 kept
+32 0 explained 0.6772 field max 11.4 median 4.61 kept
+32 1 explained 0.6796 field max 12.2 median 4.7 kept
+24 0 explained 0.6835 field max 13.5 median 4.79 kept
+24 1 explained 0.6864 field max 15.2 median 4.88 kept
+final explained 0.6864 plan vs graph height 0.99999

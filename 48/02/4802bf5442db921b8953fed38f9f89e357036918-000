@@ -1,0 +1,9 @@
+#!/bin/zsh
+# 2 November 2026 : rebuilds the level and the sequence from the config, renders one frame per shot, composes them under the Ceramic Tiles frames. FR : reconstruit niveau et séquence, rend une image par plan, sous celles de Ceramic Tiles.
+cd /Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026
+B=/Users/zenray/.claude/skills/zenray-houdini/scripts/unreal_ad/BuildAd.py
+set -e
+python3 $B unreal/alien_ad.json level | tail -n 2 | cut -c1-200
+python3 $B unreal/alien_ad.json sequence | tail -n 2 | cut -c1-200
+python3 $B unreal/alien_ad.json frames render/ue_test 1024 2 1 61,181,301,421,541,661 16 | grep -E "^frame|ERROR"
+/Users/zenray/.venvs/zenray-uv/bin/python -I fit/UeSheet.py

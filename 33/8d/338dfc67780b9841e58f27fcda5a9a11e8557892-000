@@ -1,0 +1,63 @@
+# 2 November 2026 : how much of the flat colour the height explains, with the gradient map model of HeightToBaseColor.py (height and four detail bands, measured ramps), for small global shifts of the colour.
+# The best shift is the leftover misalignment read by the module's own model. FR : combien la height explique la couleur, avec le modèle du module, pour de petits décalages ; le meilleur décalage est le calage restant.
+import json
+import sys
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+H = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_H2/FINAL_height_untiled.png"
+BANDS = [2.0, 6.0, 16.0, 48.0]   # blur sizes, sigma = size / 2 in the Blur COP. FR : tailles de flou, sigma = taille / 2.
+BINS, RANGE, ITERS = 64, 0.3, 5
+
+
+def load_h():
+    a = np.asarray(Image.open(H), np.float64)
+    return a / (65535.0 if a.max() > 255 else 255.0)
+
+
+def features(h):
+    fs = [h]
+    for s in BANDS:
+        fs.append(np.clip((h - ndi.gaussian_filter(h, s / 2.0, mode="wrap") + RANGE) / (2 * RANGE), 0, 1))
+    return [np.clip(np.round(f * (BINS - 1)).astype(np.int64), 0, BINS - 1) for f in fs]
+
+
+def fit_score(bins, ref, mask):
+    idx = [b[mask] for b in bins]
+    R = ref[mask]
+    pred = np.tile(R.mean(0), (R.shape[0], 1))
+    T = [np.zeros((BINS, 3)) for _ in idx]
+    for _ in range(ITERS):
+        for k, b in enumerate(idx):
+            pred -= T[k][b]
+            res = R - pred
+            cnt = np.maximum(np.bincount(b, minlength=BINS), 1)[:, None]
+            T[k] = np.stack([np.bincount(b, res[:, c], minlength=BINS) for c in range(3)], 1) / cnt
+            pred += T[k][b]
+    lum = float(np.corrcoef(pred.mean(1), R.mean(1))[0, 1])
+    return lum, [float(np.corrcoef(pred[:, c], R[:, c])[0, 1]) for c in range(3)]
+
+
+if __name__ == "__main__":
+    h = load_h()
+    bins = features(h)
+    ref = np.asarray(Image.open(A + "refs/flat_aligned_2048.png").convert("RGB"), np.float64) / 255.0
+    v = np.asarray(Image.open(A + "refs/valid_aligned_2048.png").convert("L"), np.float64) > 127
+    v[:32] = v[-32:] = False
+    v[:, :32] = v[:, -32:] = False
+    print("aligned, no shift", fit_score(bins, ref, v), flush=True)
+    src = np.asarray(Image.open(A + "Sources/reference_flat_basecolor.webp").convert("RGB").resize((2048, 2048), Image.LANCZOS), np.float64) / 255.0
+    print("control, source not aligned", fit_score(bins, src, v), flush=True)
+    best = (0, 0, 0)
+    for dy in (-8, -6, -4, -3, -2, 2, 4):
+        for dx in (-4, -1, 0, 3):
+            s = np.roll(ref, (dy, dx), (0, 1))
+            l = fit_score(bins, s, v)[0]
+            if l > best[0]:
+                best = (l, dy, dx)
+            print(dy, dx, round(l, 4), flush=True)
+    print("best", best)

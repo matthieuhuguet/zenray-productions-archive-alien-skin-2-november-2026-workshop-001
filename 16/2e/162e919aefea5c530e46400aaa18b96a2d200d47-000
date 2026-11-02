@@ -1,0 +1,82 @@
+# 2 November 2026 : renders the plane alone, straight on, at the framing of the lit reference, and scores it against that reference.
+# Depth, sun angle and gloss are chosen on this number and on the eye, never on a guess. FR : le plan seul, de face, au cadrage de la référence éclairée, noté contre elle.
+# Usage : python -I LitBench.py <maps dir> <name> depth=0.16 sun_x=-50 sun_y=0 [key=value ...]
+import json
+import os
+import subprocess
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+LOOK = "/Users/zenray/.claude/skills/zenray-houdini/scripts/height/LookDevMaps.py"
+os.environ.setdefault("ZR_BRIDGE_TIMEOUT", "300")
+
+
+def hom(code):
+    o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=400)
+    d = json.loads(o.stdout)
+    if not d.get("ok"):
+        raise SystemExit(str(d)[:1200])
+    return d.get("result")
+
+
+def render(maps, png, depth, sun_x, sun_y, **over):
+    # A tile of 2 metres seen from 30 metres fills a square image, almost orthographic: focal = aperture 20.955 * 30 / 2, the USD camera aperture being 20.955, not 41.42.
+    # FR : une tuile de 2 m vue de 30 m remplit une image carrée ; l'ouverture de la caméra USD vaut 20,955 et non 41,42.
+    args = dict(disp_scale=depth, disp_offset=-0.37, sun_rotate=(sun_x, sun_y, 0.0), cam_pos=(1.25, 0.0, 30.0), cam_focal=314.33, res=(1024, 1024), samples=16, sphere_x=-30.0,
+                disp_map='Displace', normal_map='NormalDetail', use_normal=True)
+    args.update(over)
+    hom(f"""
+g = {{}}
+exec(open('{LOOK}').read(), g)
+result = g['build']('{maps}', 'T_AlienSkin', '{png}', **{args!r})
+""")
+    t0 = time.time()
+    last = -1
+    while time.time() - t0 < 600:
+        if os.path.exists(png):
+            s = os.path.getsize(png)
+            if s == last and s > 0:
+                return time.time() - t0
+            last = s
+        time.sleep(2)
+    raise SystemExit("render timed out: " + png)
+
+
+def blur(a, s):
+    fy = np.fft.fftfreq(a.shape[0])[:, None]
+    fx = np.fft.rfftfreq(a.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * (np.pi * s) ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def score(png):
+    """Pearson of the luminance against the lit reference, whole and by band. FR : corrélation de la luminance avec la référence éclairée, entière et par bande."""
+    im = Image.open(png).convert("RGB")
+    r = np.asarray(im, np.float64) / 255.0
+    ref = np.asarray(Image.open(A + "refs/lit_aligned_2048.png").convert("RGB").resize(im.size, Image.LANCZOS), np.float64) / 255.0
+    v = np.asarray(Image.open(A + "refs/valid_aligned_2048.png").convert("L").resize(im.size, Image.BILINEAR), np.float64) > 200
+    m = 12
+    v[:m] = v[-m:] = False
+    v[:, :m] = v[:, -m:] = False
+    a, b = r.mean(2), ref.mean(2)
+    out = {"all": float(np.corrcoef(a[v], b[v])[0, 1])}
+    for name, lo, hi in (("broad", 16, 64), ("mid", 4, 16), ("fine", 1, 4)):
+        x = blur(a, lo) - blur(a, hi)
+        y = blur(b, lo) - blur(b, hi)
+        out[name] = float(np.corrcoef(x[v], y[v])[0, 1])
+    out["mean"] = [round(float(x), 3) for x in r[v].mean(0)]
+    out["ref_mean"] = [round(float(x), 3) for x in ref[v].mean(0)]
+    out["std"] = round(float(a[v].std()), 3)
+    out["ref_std"] = round(float(b[v].std()), 3)
+    return out
+
+
+if __name__ == "__main__":
+    maps, name = sys.argv[1], sys.argv[2]
+    kv = dict(x.split("=") for x in sys.argv[3:])
+    png = A + f"render/bench_{name}.png"
+    sec = render(maps, png, float(kv.pop("depth", 0.16)), float(kv.pop("sun_x", -50)), float(kv.pop("sun_y", 0)), **{k: float(v) for k, v in kv.items()})
+    print(name, round(sec), "s", json.dumps(score(png)))

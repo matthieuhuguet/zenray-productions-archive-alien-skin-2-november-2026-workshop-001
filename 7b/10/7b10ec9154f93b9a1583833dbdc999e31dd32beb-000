@@ -1,0 +1,40 @@
+# 2 November 2026 : one Movie Render Queue job over the whole film, at low resolution, then the video. Frames in film order. FR : un seul rendu du film entier en aperçu, puis la vidéo.
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/unreal_ad")
+import BuildAd as B
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+cfg = A + "unreal/alien_ad.json"
+C = json.load(open(cfg))
+N = json.load(open(C["film_file"]))["frames"]
+out = A + "render/ue_preview"
+RES, SPATIAL = 1024, 1
+os.makedirs(out, exist_ok=True)
+for f in glob.glob(out + "/ad_*.png"):
+    os.remove(f)
+json.dump({"start": 1, "end": N, "res": RES, "spatial": SPATIAL, "temporal": 1, "warmup": 16, "out": out, "cvars": C.get("render_cvars", {})}, open(C["render_job"], "w"))
+t0 = time.time()
+B.queue(os.path.join(os.path.dirname(B.__file__), "ue_ad_render.py"), cfg, 300)
+last, stall = 0, time.time()
+while True:
+    n = len(glob.glob(out + "/ad_*.png"))
+    if n != last:
+        last, stall = n, time.time()
+        if n % 60 == 0:
+            print(n, "frames", round(time.time() - t0), "s", flush=True)
+    if n >= N:
+        break
+    if time.time() - stall > 180:
+        raise SystemExit(f"render stopped at {n} frames")
+    time.sleep(2)
+time.sleep(2)
+print(N, "frames", round(time.time() - t0), "s", flush=True)
+film = A + "render/alien_skin_film_preview_1024.mp4"
+subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-start_number", "1", "-i", out + "/ad_%04d.png", "-c:v", "h264_videotoolbox", "-b:v", "8M", "-pix_fmt", "yuv420p", film], check=True)
+print("film", film, round(os.path.getsize(film) / 1e6, 1), "MB", flush=True)

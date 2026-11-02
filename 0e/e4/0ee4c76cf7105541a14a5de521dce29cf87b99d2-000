@@ -1,0 +1,62 @@
+# 2 November 2026 : leaves the scene on Snake, tests the menus as a click runs them, tidies the new nodes clear of the old ones, saves. FR : laisse la scène sur Snake, teste les menus comme un clic, range les nouveaux nœuds, enregistre.
+import os
+import subprocess
+
+os.environ.setdefault("ZR_BRIDGE_TIMEOUT", "600")
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+code = f"""
+import hou
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py').read(), g)
+NET = '/obj/ZRH_AlienSkinRef'
+info = g['skin_maps'](NET, '{A}maps_snake', 'T_AlienSkin', 'mid', 'snake')
+net = hou.node(NET)
+report = {{'maps_ok': info['ok'], 'errors': info['errors']}}
+sw = net.node('SK_colorway')
+menu = {{}}
+for i, name in enumerate(g['COLORWAY_ORDER']):
+    net.parm('colorway').set(i)
+    net.parm('colorway').pressButton()
+    menu[name] = [sw.parm('input').eval(), net.node('T5_export_BaseColor').parm('copoutput').eval().split('/')[-2], net.node('SK_lines_pick').parm('input').eval(), round(net.node('T5_rough_mask').parm('outputmax').eval(), 3)]
+report['menu'] = menu
+net.parm('colorway').set(g['COLORWAY_ORDER'].index('snake'))
+net.parm('colorway').pressButton()
+groups = ('HBC_', 'HBS_', 'SK_', 'T5_')
+old = [c for c in net.children() if not c.name().startswith(groups)]
+xmax = max(c.position()[0] for c in old)
+ytop = max(c.position()[1] for c in old)
+x = xmax + 6.0
+for pre in groups:
+    nodes = [c for c in net.children() if c.name().startswith(pre)]
+    if pre == 'T5_':
+        # The module lays out its first seven exports; the rest joins the same column. FR : même colonne pour tout.
+        for k, n in enumerate(nodes):
+            n.setPosition(hou.Vector2(x + (k // 30) * 3.0, ytop - 1.3 * (k % 30)))
+    else:
+        x0 = min(n.position()[0] for n in nodes)
+        y0 = max(n.position()[1] for n in nodes)
+        for n in nodes:
+            p = n.position()
+            n.setPosition(hou.Vector2(p[0] - x0 + x, p[1] - y0 + ytop))
+    b = net.findNetworkBox(pre + 'box')
+    if b:
+        for n in nodes:
+            b.addItem(n)
+        b.fitAroundContents()
+    x = max(n.position()[0] for n in nodes) + 7.0
+inside = 0
+for pre in groups:
+    b = net.findNetworkBox(pre + 'box')
+    if b:
+        p, s = b.position(), b.size()
+        inside += sum(1 for c in net.children() if not c.name().startswith(pre) and p[0] <= c.position()[0] <= p[0] + s[0] and p[1] <= c.position()[1] <= p[1] + s[1])
+report['foreign_inside_boxes'] = inside
+report['bad_nodes'] = [c.name() for c in net.children() if c.errors()][:5]
+report['counts'] = {{pre: sum(1 for c in net.children() if c.name().startswith(pre)) for pre in groups}}
+hou.hipFile.save('/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/AlienSkinRef_4_colorways.hiplc')
+report['saved'] = hou.hipFile.path()
+result = report
+"""
+o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=700)
+print(o.stdout[:1900])
+print(o.stderr[:300])

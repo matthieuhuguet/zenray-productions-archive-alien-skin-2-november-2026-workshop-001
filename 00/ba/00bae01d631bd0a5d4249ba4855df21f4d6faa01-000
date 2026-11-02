@@ -1,0 +1,24 @@
+ue_ad_render.py 1 s OK
+render started {'start': 61, 'end': 61, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 61: 7.8 s
+ue_ad_render.py 2 s OK
+render started {'start': 181, 'end': 181, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 181: 3.8 s
+ue_ad_render.py 1 s OK
+render started {'start': 301, 'end': 301, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 301: 3.3 s
+ue_ad_render.py 1 s OK
+render started {'start': 421, 'end': 421, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 421: 3.3 s
+ue_ad_render.py 2 s OK
+render started {'start': 541, 'end': 541, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 541: 3.8 s
+ue_ad_render.py 1 s OK
+render started {'start': 661, 'end': 661, 'res': 1024, 'spatial': 2, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_test', 'cvars': {}}
+
+frame 661: 3.3 s

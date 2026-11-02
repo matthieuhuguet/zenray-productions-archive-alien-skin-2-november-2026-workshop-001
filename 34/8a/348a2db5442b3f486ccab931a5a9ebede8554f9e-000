@@ -1,0 +1,16 @@
+level built /Game/ZenRayShards/Levels/L_AlienSkinAd actors 34
+
+sequence /Game/ZenRayShards/Cinematics/LS_AlienSkinAd {'cameras': 6, 'keys': 14040} frames 720
+
+frame 61: 3.8 s
+frame 181: 2.8 s
+frame 301: 4.3 s
+frame 421: 2.8 s
+frame 541: 2.8 s
+frame 661: 2.8 s
+61 median 0.399 p99 0.729 clipped 0.0
+181 median 0.4 p99 0.799 clipped 0.0
+301 median 0.222 p99 0.546 clipped 0.0
+421 median 0.38 p99 0.784 clipped 0.001
+541 median 0.38 p99 0.787 clipped 0.001
+661 median 0.374 p99 0.737 clipped 0.0

@@ -1,0 +1,40 @@
+# 2 November 2026 : what stays of the flat colour after the regions and the luminance pass is hue. Red and blue against the mean go through the same height method (Execute.py, plans L3 then L5).
+# Green takes minus both, so the mean does not move. No new module, only two more targets. FR : ce qui reste est de la teinte ; rouge et bleu passent par la même méthode height, le vert prend l'opposé.
+import json
+import os
+import sys
+
+P = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef"
+os.environ["ZRH_WORK"] = P
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import numpy as np
+from PIL import Image
+import Execute as EX
+import RunPasses as RP
+
+GAIN = 8.0   # the hue residual is about 0.01: stored at eight times its size around 0.5. FR : stocké à huit fois sa taille autour de 0,5.
+
+if __name__ == "__main__":
+    A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+    ref = np.asarray(Image.open(A + "refs/flat_aligned_2048.png").convert("RGB"), np.float64) / 255.0
+    rep = np.asarray(Image.open(A + "fit/flat_v1_untiled.png").convert("RGB"), np.float64) / 255.0
+    res = ref - rep
+    res = res - res.mean(2, keepdims=True)
+    valid = A + "refs/valid_aligned_2048.png"
+    final_dir = P + "/versions/final"
+    for name, ch in (("R", 0), ("B", 2)):
+        t = np.clip(0.5 + GAIN * res[..., ch], 0, 1)
+        print(name, "residual std", round(float(res[..., ch].std()), 5), "clipped share", round(float(((t <= 0) | (t >= 1)).mean()), 4), flush=True)
+        target = A + f"refs/flat_hue_{name}_target_2048.png"
+        Image.fromarray((t * 65535).round().astype(np.uint16)).save(target)
+        net = f"/obj/ZRH_AlienSkinRef_BC{name}"
+        h1, h2 = f"{final_dir}/AlienSkinRef_BC{name}_H1", f"{final_dir}/AlienSkinRef_BC{name}_H2"
+        EX.run(f"AlienSkinRef_BC{name}_H1", net, target, valid, plan=RP.plan_for("L3"), min_gain=0.001)
+        EX.run(f"AlienSkinRef_BC{name}_H2", net, target, valid, plan=RP.plan_for("L5"), min_gain=0.0005, resume=h1)
+    read = lambda n: np.asarray(Image.open(f"{final_dir}/AlienSkinRef_BC{n}_H2/FINAL_height.png"), np.float64)
+    r, b = read("R"), read("B")
+    r = (r / (65535.0 if r.max() > 255 else 255.0) - 0.5) / GAIN
+    b = (b / (65535.0 if b.max() > 255 else 255.0) - 0.5) / GAIN
+    out = rep + np.stack([r, -r - b, b], 2)
+    Image.fromarray((np.clip(out, 0, 1) * 255).round().astype(np.uint8)).save(A + "fit/flat_v2_untiled.png")
+    print("done", flush=True)

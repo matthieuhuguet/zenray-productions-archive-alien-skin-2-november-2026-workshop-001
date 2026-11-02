@@ -1,0 +1,41 @@
+Opening shared memory
+Existing instance is the same age or newer
+Setting up bundled DotNet SDK
+/Users/zenray/Create/Build/UE_5.8/Engine/Binaries/ThirdParty/DotNet/10.0/mac-arm64
+Running dotnet Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll -Mode=ValidatePlatforms -OutputSDKs -AllPlatforms -project=/Users/zenray/Create/Build/Productions/ZenRayShards/ZenRayShards/ZenRayShards.uproject -log=/Users/zenray/Library/Logs/Unreal Engine/ZenRayShardsEditor/AutoSDKInfo.txt -verbose -timestamps
+Log file: /Users/zenray/Library/Logs/Unreal Engine/ZenRayShardsEditor/AutoSDKInfo.txt
+2026-11-02 21:20:16.665 UnrealEditor[93609:7371540] [UE4] Shutdown handler: initialize.
+##PlatformValidate: Win64 INVALID <UNKNOWN>
+##PlatformValidate: Mac INVALID 26.1.1
+##PlatformValidate: IOS INVALID 26.1.1
+##PlatformValidate: Android INVALID r27c
+##PlatformValidate: Linux INVALID <UNKNOWN>
+##PlatformValidate: LinuxArm64 INVALID <UNKNOWN>
+##PlatformValidate: TVOS INVALID 26.1.1
+##PlatformValidate: VisionOS INVALID 26.1.1
+Unable to find required SDK version 'MainVersion' for platform Win64. Check your SDK.json files
+Unable to find required SDK version 'MainVersion' for platform Linux. Check your SDK.json files
+Unable to find required SDK version 'MainVersion' for platform LinuxArm64. Check your SDK.json files
+Trace written to file /Users/zenray/Library/Application Support/Epic/UnrealBuildTool/Trace.uba with size 331b
+LogStreaming: Display: AsyncLoading2 - Created: Async Loading Thread: true, Async Post Load: true, Multithreaded: false
+LogAnalytics: Display: [CrashReporter.Release] AnalyticsET::StartSession ( APIServer = https://datarouter.ol.epicgames.com/datarouter/api/v1/public/data. AppVersion = ++UE5+Release-5.8-CL-56057345 )
+CrashReportCoreLog: Display: Applying project settings from '/Users/zenray/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Crashes/CrashReport-UE-ZenRayShards-pid-93609-60234BECF64ED60EFCD1069C3905A61D/CrashReportClient.ini'.
+LogSlate: Display: Synchronously lazy loading font file '../../../Engine/Content/Slate/Fonts/Roboto-Regular.ttf' with subface index 0 in Game thread.
+LogSlate: Display: Took 0.000311 seconds to synchronously load lazily loaded font '../../../Engine/Content/Slate/Fonts/Roboto-Regular.ttf' (155K) on Game thread.
+LogSlate: Display: Freetype font face in memory successfully created with synchronously loaded raw font file '../../../Engine/Content/Slate/Fonts/Roboto-Regular.ttf' subface 0 in Game thread.
+LogSlate: Display: Font face '../../../Engine/Content/Slate/Fonts/Roboto-Regular.ttf' subface index 0 successfully added to font face map in Game thread.
+LogSlate: Display: Synchronously lazy loading font file '../../../Engine/Content/Slate/Fonts/Roboto-Bold.ttf' with subface index 0 in Game thread.
+LogSlate: Display: Took 0.000225 seconds to synchronously load lazily loaded font '../../../Engine/Content/Slate/Fonts/Roboto-Bold.ttf' (160K) on Game thread.
+LogSlate: Display: Freetype font face in memory successfully created with synchronously loaded raw font file '../../../Engine/Content/Slate/Fonts/Roboto-Bold.ttf' subface 0 in Game thread.
+LogSlate: Display: Font face '../../../Engine/Content/Slate/Fonts/Roboto-Bold.ttf' subface index 0 successfully added to font face map in Game thread.
+LogSlate: Display: Synchronously lazy loading font file '../../../Engine/Content/Slate/Fonts/Roboto-Italic.ttf' with subface index 0 in Game thread.
+LogSlate: Display: Took 0.000242 seconds to synchronously load lazily loaded font '../../../Engine/Content/Slate/Fonts/Roboto-Italic.ttf' (157K) on Game thread.
+LogSlate: Display: Freetype font face in memory successfully created with synchronously loaded raw font file '../../../Engine/Content/Slate/Fonts/Roboto-Italic.ttf' subface 0 in Game thread.
+LogSlate: Display: Font face '../../../Engine/Content/Slate/Fonts/Roboto-Italic.ttf' subface index 0 successfully added to font face map in Game thread.
+UNSUPPORTED (log once): POSSIBLE ISSUE: unit 0 GLD_TEXTURE_INDEX_RECTANGLE is unloadable and bound to sampler type (Float) - using zero texture because texture unloadable
+LogStreaming: Warning: Failed to read file '/Users/zenray/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Crashes/CrashReport-UE-ZenRayShards-pid-93609-60234BECF64ED60EFCD1069C3905A61D/Report.wer' error.
+LogStreaming: Error: Failed to read file '/Users/zenray/Library/Application Support/Epic/UnrealEngine/5.8/Saved/Crashes/CrashReport-UE-ZenRayShards-pid-93609-60234BECF64ED60EFCD1069C3905A61D/Report.wer' error.
+LogAnalytics: Display: [CrashReporter.Release] AnalyticsET::EndSession
+LogHttp: Warning: [FHttpManager::Shutdown] Unbinding delegates for 1 outstanding Http Requests:
+LogHttp: Warning: 	verb=[POST] url=[https://datarouter.ol.epicgames.com/datarouter/api/v1/public/data?SessionID=%7BE050C3D6-934A-C5FA-E138-67A622A2416D%7D&AppID=CrashReporter.Release&AppVersion=%2B%2BUE5%2BRelease-5.8-CL-56057345&UserID=b7a97630784be8be74c77d8a0189f5c7%7Cde42bf9614fb4a358b5ec0b666fe2338%7C3E938797-0292-5359-9489-044E2A393091&AppEnvironment=datacollector-binary&UploadType=eteventstream] refs=[2] status=Processing
+LogHttp: Warning: 	Sleeping 0.500s to wait for 1 outstanding Http Requests.

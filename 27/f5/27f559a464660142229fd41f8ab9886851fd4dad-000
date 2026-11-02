@@ -1,0 +1,13 @@
+frames 648 27.0 s cameras [('AdCamShot1', 0, 120), ('AdCamShot2', 120, 240), ('AdCamShot3', 240, 288), ('AdCamShot4', 288, 336), ('AdCamShot5', 336, 384), ('AdCamShot6', 384, 432), ('AdCamShot7', 432,
+ue_ad_level.py 3 s OK
+level built /Game/ZenRayShards/Levels/L_AlienSkinAd actors 84
+
+ue_ad_sequence.py 1 s OK
+sequence /Game/ZenRayShards/Cinematics/LS_AlienSkinAd cameras 9 keys 10368 frames 648
+
+ue_ad_render.py 1 s OK
+render started {'start': 1, 'end': 648, 'res': 1024, 'spatial': 1, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_preview', 'cvars': {}}
+
+360 frames 25 s
+648 frames 43 s
+film /Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_film_preview_1024.mp4 27.5 MB

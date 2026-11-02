@@ -1,0 +1,8 @@
+22:23:26 job from frame 1 attempt 1
+ue_ad_render.py 2 s OK
+render started {'start': 1, 'end': 648, 'res': 4096, 'spatial': 2, 'temporal': 4, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/final_4096', 'cvars': {}}
+
+22:24:02 first frame median 0.263 (4096, 4096)
+22:27:32 60 frames 245 s
+22:30:57 120 frames 451 s
+22:34:12 180 frames 646 s

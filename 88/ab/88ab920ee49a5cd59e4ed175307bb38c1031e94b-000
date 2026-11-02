@@ -1,0 +1,8 @@
+#!/bin/zsh
+# 2 November 2026 : rebuilds the film in the open editor and renders its preview. FR : reconstruit le film dans l'éditeur ouvert et rend son aperçu.
+cd /Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026
+U=/Users/zenray/.claude/skills/zenray-houdini/scripts/unreal_ad
+set -e
+python3 $U/BuildFilmSpec.py unreal/alien_ad.json | cut -c1-200
+for step in ${1:-assets} level sequence; do [ "$step" = none ] || python3 $U/BuildAd.py unreal/alien_ad.json $step | tail -n 4 | cut -c1-260; done
+/Users/zenray/.venvs/zenray-uv/bin/python -I fit/RunPreview.py

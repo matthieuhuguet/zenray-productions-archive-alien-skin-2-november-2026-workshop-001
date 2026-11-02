@@ -1,0 +1,61 @@
+# 2 November 2026 : final maps in green, the menus tested the way a click runs them, old colour networks removed, scene saved. FR : cartes finales en vert, menus testés comme un clic, anciens réseaux de couleur retirés, scène enregistrée.
+import json
+import os
+import subprocess
+
+os.environ.setdefault("ZR_BRIDGE_TIMEOUT", "600")
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+code = f"""
+import hou
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py').read(), g)
+NET = '/obj/ZRH_AlienSkinRef'
+info = g['skin_maps'](NET, '{A}maps_green', 'T_AlienSkin', 'mid', 'green')
+net = hou.node(NET)
+report = {{'maps_ok': info['ok'], 'errors': info['errors']}}
+# Colourway menu, red then back. FR : menu des coloris, rouge puis retour.
+net.parmTuple('stone_colour').set((0.0, 0.0, 0.0))
+net.parm('colorway').set(1)
+net.parm('colorway').pressButton()
+report['red_stone_after_menu'] = [round(x, 4) for x in net.parmTuple('stone_colour').eval()]
+sw = net.node('SK_colorway')
+report['switch_on_red'] = sw.parm('input').eval()
+report['export_path_on_red'] = net.node('T5_export_BaseColor').parm('copoutput').eval()
+net.parm('colorway').set(0)
+net.parm('colorway').pressButton()
+report['switch_on_green'] = sw.parm('input').eval()
+report['export_path_on_green'] = net.node('T5_export_BaseColor').parm('copoutput').eval()
+# Variant menu. FR : menu des variantes.
+net.parm('variant').set(2)
+net.parm('variant').pressButton()
+report['high_relief'] = net.parm('relief_depth_cm').eval()
+net.parm('variant').set(1)
+net.parm('variant').pressButton()
+report['mid_relief'] = net.parm('relief_depth_cm').eval()
+# The old colour networks gave way to HBC_ and SK_. Older scene files keep them. FR : les anciens réseaux ont laissé place à HBC_ et SK_ ; les anciennes scènes les gardent.
+gone = []
+for n in ('ZRH_AlienSkinRef_BC', 'ZRH_AlienSkinRef_BCd', 'ZRH_AlienSkinRef_BCR', 'ZRH_AlienSkinRef_BCB'):
+    x = hou.node('/obj/' + n)
+    if x:
+        x.destroy()
+        gone.append(n)
+report['removed'] = gone
+report['lines_net_alive'] = bool(hou.node('/obj/ZRH_AlienSkinRef_Lines'))
+for c in net.children():
+    c.setDisplayFlag(False) if False else None
+boxes = {{}}
+for b in net.networkBoxes():
+    if b.comment() and b.items():
+        p = b.position()
+        s = b.size()
+        boxes[b.name()] = [round(p[0], 1), round(p[1], 1), round(s[0], 1), round(s[1], 1)]
+report['boxes'] = {{k: v for k, v in boxes.items() if k.split('_')[0] in ('HBC', 'SK', 'T5')}}
+report['parm_folders'] = [f.label() for f in net.parmTemplateGroup().entries() if isinstance(f, hou.FolderParmTemplate)]
+report['children'] = len(net.children())
+hou.hipFile.save('/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/AlienSkinRef_3_colorways.hiplc')
+report['saved'] = hou.hipFile.path()
+result = report
+"""
+o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=700)
+print(o.stdout[:2600])
+print(o.stderr[:500])

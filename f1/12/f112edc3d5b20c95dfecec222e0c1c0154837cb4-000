@@ -1,0 +1,19 @@
+# 2 November 2026 : the flat base color through the base colour step that ZenRay Height already has (ExecuteBC, as Reproduce.py calls it), on the reference aligned to the height,
+# with the height's own seamless layer so both maps repeat and stay aligned. One finer level is added because this reference is full of fine lines.
+# FR : la base color plate passe par l'étape que ZenRay Height a déjà (ExecuteBC), sur la référence alignée à la height, avec la couche seamless de la height.
+import json
+import os
+import sys
+
+P = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef"
+os.environ["ZRH_WORK"] = P
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import ExecuteBC as BC
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/refs/"
+seam = json.load(open(P + "/versions/final/AlienSkinRef_H2/recipe_current.json"))[-1]
+assert seam["type"] == "seamless"
+log = BC.run("AlienSkinRef_BC", "/obj/ZRH_AlienSkinRef_BC", A + "flat_aligned_2048.png", A + "valid_aligned_2048.png", cells=(1, 1),
+             levels=BC.LEVELS + ((32, 2048), (48, 2048)), seam=seam, out_root=P + "/versions/final/AlienSkinRef_BC")
+print(json.dumps({k: log.get(k) for k in ("final", "seam")}, indent=1)[:800])
+print(json.dumps([{k: l.get(k) for k in ("layer", "status", "deltaE76_mean", "lum_pearson", "seconds")} for l in log["layers"]])[:900])

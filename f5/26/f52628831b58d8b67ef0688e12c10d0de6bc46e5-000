@@ -1,0 +1,16 @@
+# 2 November 2026 : one look test on the green maps with the map values kept. FR : un essai d'aspect sur les cartes vertes, valeurs des cartes gardées.
+import json
+import sys
+
+sys.path.insert(0, "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/fit")
+import RunColorways as R
+
+name = sys.argv[1]
+look = dict(R.LOOK)
+for kv in sys.argv[2:]:
+    k, v = kv.split("=", 1)
+    look[k] = json.loads(v)
+png = f"{R.A}render/test_{name}.png"
+maps = look.pop("maps", "maps_green")
+print(name, R.render(R.A + maps, png, look), "s", flush=True)
+R.on_ground(png).save(f"{R.A}render/test_{name}_on_ground.png")

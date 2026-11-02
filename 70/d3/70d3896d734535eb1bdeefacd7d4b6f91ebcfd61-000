@@ -1,0 +1,26 @@
+# 2 November 2026 : rebuilds the skin nodes, writes the mid maps, then scores relief depth and sun angle on the plane, one render after the other.
+# FR : reconstruit les nœuds de la peau, écrit les cartes mid, puis note la profondeur et l'angle du soleil sur le plan, un rendu après l'autre.
+import json
+import sys
+
+sys.path.insert(0, "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/fit")
+import LitBench as B
+
+A = B.A
+NET = "/obj/ZRH_AlienSkinRef"
+MAPS = "/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py"
+best = None
+for depth in (0.08, 0.16, 0.24, 0.36):
+    for sun_x in (-55.0,):
+        png = A + f"render/bench_d{int(depth * 100)}_s{int(-sun_x)}.png"
+        sec = B.render(A + "maps_mid", png, depth, sun_x, 0.0, dome_intensity=0.5, sun_intensity=3.0, coat=0.3, coat_rough=0.25)
+        sc = B.score(png)
+        print(depth, sun_x, round(sec), "s", json.dumps(sc), flush=True)
+        if best is None or sc["all"] > best[0]:
+            best = (sc["all"], depth)
+depth = best[1]
+for sun_x in (-35.0, -70.0):
+    png = A + f"render/bench_d{int(depth * 100)}_s{int(-sun_x)}.png"
+    sec = B.render(A + "maps_mid", png, depth, sun_x, 0.0, dome_intensity=0.5, sun_intensity=3.0, coat=0.3, coat_rough=0.25)
+    print(depth, sun_x, round(sec), "s", json.dumps(B.score(png)), flush=True)
+print("done", flush=True)

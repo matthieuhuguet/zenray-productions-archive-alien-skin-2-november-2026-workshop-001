@@ -1,0 +1,20 @@
+# 2 November 2026 : second scoring round, sign of the light, depth and the normal map switched off. FR : deuxième tour, signe de la lumière, profondeur, normale coupée.
+import json
+import sys
+
+sys.path.insert(0, "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/fit")
+import LitBench as B
+
+A = B.A
+LOOK = dict(dome_intensity=0.5, sun_intensity=3.0, coat=0.3, coat_rough=0.25)
+for name, depth, sun_x, over in (
+    ("flip35", 0.08, 35.0, {}),
+    ("nonormal35", 0.08, -35.0, {"use_normal": False}),
+    ("d4s35", 0.04, -35.0, {}),
+    ("d8s20", 0.08, -20.0, {}),
+    ("d12s25", 0.12, -25.0, {}),
+):
+    png = A + f"render/bench2_{name}.png"
+    sec = B.render(A + "maps_mid", png, depth, sun_x, 0.0, **dict(LOOK, **over))
+    print(name, depth, sun_x, round(sec), "s", json.dumps(B.score(png)), flush=True)
+print("done", flush=True)

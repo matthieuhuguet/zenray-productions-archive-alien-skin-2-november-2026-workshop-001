@@ -1,0 +1,69 @@
+# 2 November 2026 : low, mid, high : maps and one Karma render each, one after the other. FR : low, mid, high : cartes et un rendu Karma chacun, l'un après l'autre.
+import json
+import os
+import subprocess
+import time
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+NET = "/obj/ZRH_AlienSkinRef"
+os.environ["ZR_BRIDGE_TIMEOUT"] = "300"
+
+
+def hom(code):
+    o = subprocess.run(["/opt/homebrew/bin/python3", "/Users/zenray/.claude/Memory1/Houdini/MCP/zrhoudini.py", "hom", code, "live"], capture_output=True, text=True, timeout=400)
+    d = json.loads(o.stdout)
+    if not d.get("ok"):
+        raise SystemExit(str(d)[:1200])
+    return d.get("result")
+
+
+print(hom(f"""
+import hou
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py').read(), g)
+net = hou.node('{NET}')
+# The procedural colour is not the need here: its nodes leave this graph, a copy of the scene keeps them.
+# FR : la couleur procédurale n'est pas le besoin ici : ses nœuds quittent ce graphe, une copie de la scène les garde.
+for c in list(net.children()):
+    if c.name().startswith(('PBC_', 'T5_', 'TEST_')):
+        c.destroy()
+for b in list(net.networkBoxes()):
+    if b.name().startswith('PBC_') or not b.items():
+        net.deleteNetworkBox(b) if hasattr(net, 'deleteNetworkBox') else b.destroy()
+g['skin_controls'](net)
+result = g['skin_link']('{NET}', '/obj/ZRH_AlienSkinRef_BC', '/obj/ZRH_AlienSkinRef_BCd')
+"""), flush=True)
+for v, depth in (("low", 0.10), ("mid", 0.16), ("high", 0.24)):
+    out = f"{A}maps_{v}"
+    r = hom(f"""
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py').read(), g)
+info = g['skin_maps']('{NET}', '{out}', 'T_AlienSkin', '{v}')
+result = {{'ok': info['ok'], 'errors': info['errors'], 'normal_scale': info['normal_scale']}}
+""")
+    print(v, r, flush=True)
+    png = f"{A}render/skin_{v}.png"
+    r = hom(f"""
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/LookDevMaps.py').read(), g)
+result = g['build']('{out}', 'T_AlienSkin', '{png}', disp_scale={depth}, disp_offset=-0.37)
+""")
+    t0 = time.time()
+    last = -1
+    while time.time() - t0 < 900:
+        if os.path.exists(png):
+            s = os.path.getsize(png)
+            if s == last and s > 0:
+                break
+            last = s
+        time.sleep(4)
+    print(v, "render", os.path.exists(png), round(time.time() - t0), "s", flush=True)
+hom(f"""
+g = {{}}
+exec(open('/Users/zenray/.claude/skills/zenray-houdini/scripts/height/HeightTo5MapsCop.py').read(), g)
+info = g['skin_maps']('{NET}', '{A}maps_mid', 'T_AlienSkin', 'mid')
+import hou
+hou.hipFile.save('/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/AlienSkinRef_seamless.hiplc')
+result = 1
+""")
+print("done", flush=True)

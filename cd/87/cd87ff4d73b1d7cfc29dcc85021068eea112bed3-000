@@ -1,0 +1,72 @@
+# 2 November 2026 : the final render of the film in Unreal, Movie Render Queue, 4096 x 4096, same samples as the Ceramic Tiles final (spatial 2, temporal 4). Resumes from the first missing frame if the output stops for 6 minutes, checks the first frame, then writes the video. Progress in render/final_4096/LOG.txt.
+# FR : le rendu final du film dans Unreal, en 4096 ; reprend à la première image manquante si la sortie s'arrête 6 minutes, contrôle la première image, puis écrit la vidéo.
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/unreal_ad")
+import BuildAd as B
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+cfg = A + "unreal/alien_ad.json"
+C = json.load(open(cfg))
+N = json.load(open(C["film_file"]))["frames"]
+out = A + "render/final_4096"
+RES, SPATIAL, TEMPORAL, WARMUP, STALL_S, TRIES = 4096, 2, 4, 16, 360, 12
+os.makedirs(out, exist_ok=True)
+
+
+def log(*a):
+    line = time.strftime("%H:%M:%S ") + " ".join(str(x) for x in a)
+    print(line, flush=True)
+    open(out + "/LOG.txt", "a").write(line + "\n")
+
+
+def missing():
+    return [f for f in range(1, N + 1) if not os.path.exists(f"{out}/ad_{f:04d}.png")]
+
+
+t0 = time.time()
+checked = False
+for attempt in range(TRIES):
+    todo = missing()
+    if not todo:
+        break
+    json.dump({"start": todo[0], "end": N, "res": RES, "spatial": SPATIAL, "temporal": TEMPORAL, "warmup": WARMUP, "out": out, "cvars": C.get("render_cvars", {})}, open(C["render_job"], "w"))
+    log("job from frame", todo[0], "attempt", attempt + 1)
+    B.queue(os.path.join(os.path.dirname(B.__file__), "ue_ad_render.py"), cfg, 600)
+    last, stall = len(todo), time.time()
+    while True:
+        left = len(missing())
+        if left != last:
+            if (N - left) // 60 != (N - last) // 60:
+                done = N - left
+                log(done, "frames", round(time.time() - t0), "s")
+            last, stall = left, time.time()
+        if not checked and os.path.exists(f"{out}/ad_0001.png"):
+            time.sleep(3)
+            m = float(np.median(np.asarray(Image.open(f"{out}/ad_0001.png").convert("L").resize((256, 256)), float) / 255))
+            log("first frame median", round(m, 3), Image.open(f"{out}/ad_0001.png").size)
+            if not 0.05 < m < 0.8:
+                raise SystemExit(f"first frame looks wrong: median {m}")
+            checked = True
+        if left == 0:
+            break
+        if time.time() - stall > STALL_S:
+            log("output stopped at", N - left, "frames")
+            break
+        time.sleep(5)
+left = missing()
+if left:
+    raise SystemExit(f"{len(left)} frames missing after {TRIES} attempts, first {left[0]}")
+time.sleep(3)
+log("all", N, "frames in", round(time.time() - t0), "s")
+film = A + "render/alien_skin_film_4096_24fps.mp4"
+subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "24", "-start_number", "1", "-i", out + "/ad_%04d.png", "-c:v", "hevc_videotoolbox", "-b:v", "80M", "-tag:v", "hvc1", "-pix_fmt", "yuv420p", film], check=True)
+log("film", film, round(os.path.getsize(film) / 1e6, 1), "MB")

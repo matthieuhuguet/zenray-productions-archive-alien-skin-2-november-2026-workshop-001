@@ -1,0 +1,182 @@
+# 2 November 2026, 22:55 : the final render in two resolutions, after two 4096 crashes (DiaphragmDOF shader, 22:37 and 22:48).
+# Measured at 22:47: a job resumed in the middle of a shot by a freshly started editor does NOT match the frames of the first run (frame 238: mean abs diff 0.047,
+# brighter speculars), while frames inside one run differ by 0.001. So every job here starts on a shot cut, exactly as the first run did, and resumes from the
+# start of the shot after a crash. High resolution frames already on disk are kept (hi_render false) or rendered up to the shot cut nearest to target_fraction;
+# the low resolution job starts on the shot cut before the switch, overlaps the high frames, and the switch frame is compared in both: if they differ more than
+# raccord_max_diff, the switch moves back to that shot cut, so any change of look or sharpness falls on a cut. Then one 4096 film (low frames upscaled with
+# lanczos, bt709) with the soundtrack if it exists. Settings: block final_split of alien_ad.json.
+# Usage : python3 RunFinalSplit.py [--plan]      FR : rendu final en deux résolutions ; chaque tâche part d'une coupe de plan ; raccord mesuré, sinon bascule sur la coupe.
+import glob
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+
+import numpy as np
+from PIL import Image
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/unreal_ad")
+import BuildAd as B
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+cfg = A + "unreal/alien_ad.json"
+C = json.load(open(cfg))
+S = C["final_split"]
+film = json.load(open(C["film_file"]))
+N = film["frames"]
+HI, LO, RAC = A + S["hi_dir"], A + S["lo_dir"], A + S["raccord_dir"]
+for d in (HI, LO, RAC):
+    os.makedirs(d, exist_ok=True)
+Q = os.path.expanduser("~/.claude/tmp/tmp-unreal-queue")
+
+
+def log(*a):
+    line = time.strftime("%H:%M:%S ") + " ".join(str(x) for x in a)
+    print(line, flush=True)
+    open(HI + "/LOG.txt", "a").write(line + "\n")
+
+
+def angle(u, v):
+    return math.degrees(math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(u, v))))))
+
+
+def shot_cuts():
+    """Last frame (1-based) of each shot: the view direction jumps far more than inside the cameras, or the focal changes. A colour cut keeps the pose, so it is not one."""
+    cuts = []
+    for a, b in zip(film["cameras"], film["cameras"][1:]):
+        step = max(angle(f["fwd"], g["fwd"]) for cam in (a, b) for f, g in zip(cam["frames"], cam["frames"][1:]))
+        if angle(a["frames"][-1]["fwd"], b["frames"][0]["fwd"]) > max(1.0, 4.0 * step) or abs(a["frames"][-1]["focal"] - b["frames"][0]["focal"]) > 0.1:
+            cuts.append(a["end"])
+    return cuts
+
+
+def shot_start(frame):
+    """First frame (1-based) of the shot that holds `frame`. FR : la première image du plan qui contient cette image."""
+    return max([0] + [c for c in CUTS if c < frame]) + 1
+
+
+def good(path):
+    try:
+        Image.open(path).load()
+        return True
+    except Exception:
+        return False
+
+
+def have(out, f):
+    p = f"{out}/ad_{f:04d}.png"
+    return os.path.exists(p) and good(p)
+
+
+CUTS = shot_cuts()
+hi_last = 0
+while hi_last < N and have(HI, hi_last + 1):
+    hi_last += 1
+if S.get("hi_render", True):
+    SWITCH = S.get("switch_frame") or min(CUTS, key=lambda c: (abs(c - S["target_fraction"] * N), -c))
+else:
+    SWITCH = S.get("switch_frame") or hi_last
+LO_START = shot_start(SWITCH)
+if "--plan" in sys.argv:
+    print("shot cuts", CUTS, "high frames on disk", hi_last, "switch", SWITCH, f"{SWITCH / N:.1%}", "low job from", LO_START, "to", N)
+    sys.exit(0)
+
+
+def editor_alive():
+    return subprocess.run(["pgrep", "-f", "UnrealEditor.*" + os.path.basename(S["uproject"])], capture_output=True).returncode == 0
+
+
+def ping(timeout):
+    for f in glob.glob(Q + "/*ue_ad_ping.py"):
+        os.remove(f)
+    r = subprocess.Popen([sys.executable, B.__file__, cfg, "ping"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        return r.wait(timeout) == 0
+    except subprocess.TimeoutExpired:
+        r.kill()
+        for f in glob.glob(Q + "/*ue_ad_ping.py"):
+            os.remove(f)
+        return False
+
+
+def ensure_editor():
+    if ping(30):
+        return
+    if not editor_alive():
+        log("editor dead, relaunching")
+        subprocess.run(["open", "-n", S["editor_app"], "--args", S["uproject"]], check=True)
+    t0 = time.time()
+    while not ping(30):
+        if time.time() - t0 > 600:
+            raise SystemExit("the editor does not answer after 10 minutes")
+    log("editor answers")
+
+
+def render(out, res, first, last):
+    """Renders first..last (1-based, included) into out. Each job starts on the shot that holds the first missing frame, re-rendering its earlier frames, so the look matches the first run."""
+    t0 = time.time()
+    for attempt in range(S["tries"]):
+        todo = [f for f in range(first, last + 1) if not have(out, f)]
+        if not todo:
+            return
+        start = max(first, shot_start(todo[0]))
+        ensure_editor()
+        json.dump({"start": start, "end": last, "res": res, "spatial": S["spatial"], "temporal": S["temporal"], "warmup": S["warmup"], "out": out, "cvars": C.get("render_cvars", {})}, open(C["render_job"], "w"))
+        log("job", res, "frames", start, "to", last, "attempt", attempt + 1)
+        try:
+            B.queue(os.path.join(os.path.dirname(B.__file__), "ue_ad_render.py"), cfg, 600)
+        except SystemExit as e:
+            log("queue failed", e)
+            continue
+        mark, stall, done = time.time(), time.time(), 0
+        while True:
+            new = [f for f in range(start, last + 1) if os.path.exists(f"{out}/ad_{f:04d}.png") and os.path.getmtime(f"{out}/ad_{f:04d}.png") >= mark - 1]
+            if len(new) != done:
+                if len(new) // 48 != done // 48:
+                    log(res, "frame", new[-1], "/", last, round(time.time() - t0), "s")
+                done, stall = len(new), time.time()
+            if done == last - start + 1:
+                time.sleep(3)
+                break
+            if time.time() - stall > S["stall_s"] or (time.time() - stall > 60 and not editor_alive()):
+                log("output stopped at frame", new[-1] if new else start, "editor alive", editor_alive())
+                break
+            time.sleep(5)
+    left = [f for f in range(first, last + 1) if not have(out, f)]
+    if left:
+        raise SystemExit(f"{len(left)} frames missing in {out}, first {left[0]}")
+
+
+def small(path, size=512):
+    return np.asarray(Image.open(path).convert("RGB").resize((size, size), Image.LANCZOS), float) / 255.0
+
+
+log("split render: cuts", CUTS, "high frames on disk", hi_last, "switch", SWITCH, f"({SWITCH / N:.1%})", "low job from", LO_START, "at", S["lo_res"])
+if S.get("hi_render", True):
+    render(HI, S["hi_res"], 1, SWITCH)
+render(LO, S["lo_res"], LO_START, N)
+# The switch frame exists in both resolutions: measure the join; if it is not invisible, switch on the shot cut instead. FR : raccord mesuré ; sinon la bascule recule à la coupe.
+d = float(np.abs(small(f"{HI}/ad_{SWITCH:04d}.png") - small(f"{LO}/ad_{SWITCH:04d}.png")).mean())
+log("raccord frame", SWITCH, S["hi_res"], "vs", S["lo_res"], "mean abs diff", round(d, 4), "limit", S["raccord_max_diff"])
+if d > S["raccord_max_diff"] and LO_START - 1 > 0:
+    SWITCH = LO_START - 1
+    log("join not invisible: switch moved back to the shot cut, frame", SWITCH)
+log("film:", SWITCH, "frames at", S["hi_res"], "+", N - SWITCH, "at", S["lo_res"], "upscaled")
+json.dump({"switch": SWITCH, "raccord_diff": d, "cuts": CUTS}, open(RAC + "/split.json", "w"))
+
+out = A + S["film"]
+music = A + S["soundtrack"]
+r = S["hi_res"]
+cmd = ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(film["fps"]), "-start_number", "1", "-i", HI + "/ad_%04d.png",
+       "-framerate", str(film["fps"]), "-start_number", str(SWITCH + 1), "-i", LO + "/ad_%04d.png"]
+if os.path.exists(music):
+    cmd += ["-i", music]
+cmd += ["-filter_complex", f"[0:v]trim=end_frame={SWITCH},setpts=PTS-STARTPTS[a];[1:v]scale={r}:{r}:flags=lanczos,setpts=PTS-STARTPTS[b];"
+        f"[a][b]concat=n=2:v=1:a=0,scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]", "-map", "[v]"]
+if os.path.exists(music):
+    cmd += ["-map", "2:a", "-c:a", "aac", "-b:a", S["audio_bitrate"], "-shortest"]
+cmd += ["-c:v", "hevc_videotoolbox", "-b:v", S["video_bitrate"], "-tag:v", "hvc1", "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-movflags", "+faststart", out]
+subprocess.run(cmd, check=True)
+log("film", out, round(os.path.getsize(out) / 1e6, 1), "MB", "with music" if os.path.exists(music) else "no music")

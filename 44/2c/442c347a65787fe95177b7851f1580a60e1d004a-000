@@ -1,0 +1,8 @@
+{'nodes': 23, 'errors': {}}
+low {'ok': True, 'errors': {}, 'normal_scale': 0.1}
+low render True 48 s
+mid {'ok': True, 'errors': {}, 'normal_scale': 0.16}
+mid render True 60 s
+high {'ok': True, 'errors': {}, 'normal_scale': 0.24}
+high render True 68 s
+done

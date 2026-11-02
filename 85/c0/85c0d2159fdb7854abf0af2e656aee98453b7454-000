@@ -1,0 +1,18 @@
+# 2 November 2026 : Ceramic Tiles on top, Alien Skin below, the same six shots. FR : Ceramic Tiles en haut, Alien Skin en bas, les mêmes six plans.
+import os
+import numpy as np
+from PIL import Image
+C = "/Users/zenray/Create/Build/Productions/ZenRayHoudini/CeramicTiles/render/final_ue/"
+fr = (61, 181, 301, 421, 541, 661)
+s = 512
+sheet = Image.new('RGB', (s * 6 + 50, s * 2 + 10), (16, 16, 14))
+for i, f in enumerate(fr):
+    p = f"render/ue_test/ad_{f:04d}.png"
+    im = Image.open(p).convert('RGB').resize((s, s), Image.LANCZOS)
+    a = np.asarray(im, float).mean(2) / 255
+    print(f, 'median', round(float(np.median(a)), 3), 'p99', round(float(np.percentile(a, 99)), 3), 'clipped', round(float((a > 0.98).mean()), 3))
+    sheet.paste(im, (i * (s + 10), s + 10))
+    q = C + f"ad_{f:04d}.png"
+    if os.path.exists(q):
+        sheet.paste(Image.open(q).convert('RGB').resize((s, s), Image.LANCZOS), (i * (s + 10), 0))
+sheet.save('render/ue_test_vs_ceramic.png')

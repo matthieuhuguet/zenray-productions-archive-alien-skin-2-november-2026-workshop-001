@@ -1,0 +1,64 @@
+# 2 November 2026 : are the new references the same layout as the height? Block matching between the light crest lines of the flat base color and the lips of the height.
+# FR : les nouvelles références ont-elles la même disposition que la height ? Mise en correspondance par blocs entre les lignes de crête de la base color et les lèvres de la height.
+import json
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+ROOT = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+PROJECT = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/"
+SIZE = 1024
+load = lambda p: np.asarray(Image.open(p).convert("RGB").resize((SIZE, SIZE), Image.LANCZOS), np.float64) / 255.0
+lit = load(ROOT + "Sources/reference_lit.webp")
+flat = load(ROOT + "Sources/reference_flat_basecolor.webp")
+h = np.asarray(Image.fromarray((np.asarray(Image.open(PROJECT + "versions/final/AlienSkinRef_H2/FINAL_height_untiled.png"), np.float64) / 65535.0).astype(np.float32), "F").resize((SIZE, SIZE), Image.BICUBIC), np.float64)
+ncc = lambda a, b: float(np.corrcoef(a.ravel(), b.ravel())[0, 1])
+print("lit vs flat luminance corr", round(ncc(lit.mean(2), flat.mean(2)), 4), "band-pass", round(ncc(lit.mean(2) - ndi.gaussian_filter(lit.mean(2), 8), flat.mean(2) - ndi.gaussian_filter(flat.mean(2), 8)), 4))
+crest_flat = flat[..., 0] - flat[..., 2] * 0 - flat[..., 1]  # beige lines: red above green
+crest_flat = ndi.gaussian_filter(crest_flat, 1.5)
+lips = ndi.gaussian_filter(h, 1.5) - ndi.gaussian_filter(h, 8)
+print("crest lines of flat vs lips of height, direct corr", round(ncc(crest_flat, lips), 4))
+Image.fromarray((np.clip((crest_flat - crest_flat.min()) / (np.quantile(crest_flat, .995) - crest_flat.min()), 0, 1) * 255).astype(np.uint8)).save(ROOT + "fit/feature_flat_crest.png")
+Image.fromarray((np.clip((lips - np.quantile(lips, .01)) / (np.quantile(lips, .99) - np.quantile(lips, .01)), 0, 1) * 255).astype(np.uint8)).save(ROOT + "fit/feature_height_lips.png")
+
+
+def block_shift(a, b, size, step, search):
+    H, W = a.shape
+    ys = list(range(size // 2 + search, H - size // 2 - search, step))
+    xs = list(range(size // 2 + search, W - size // 2 - search, step))
+    win = np.outer(np.hanning(size), np.hanning(size))
+    dx = np.zeros((len(ys), len(xs)))
+    dy = np.zeros_like(dx)
+    conf = np.zeros_like(dx)
+    for i, y in enumerate(ys):
+        for j, x in enumerate(xs):
+            A = a[y - size // 2:y + size // 2, x - size // 2:x + size // 2]
+            best = (-2, 0, 0)
+            A = (A - A.mean()) * win
+            sa = np.sqrt((A ** 2).sum()) + 1e-9
+            big = b[y - size // 2 - search:y + size // 2 + search, x - size // 2 - search:x + size // 2 + search]
+            f = np.fft.ifft2(np.fft.fft2(big) * np.conj(np.fft.fft2(A, s=big.shape))).real
+            sub = f[:2 * search + 1, :2 * search + 1]
+            py, px = np.unravel_index(int(np.argmax(sub)), sub.shape)
+            B = big[py:py + size, px:px + size]
+            B = (B - B.mean()) * win
+            c = float((A * B).sum() / (sa * (np.sqrt((B ** 2).sum()) + 1e-9)))
+            dx[i, j], dy[i, j], conf[i, j] = px - search, py - search, c
+    return ys, xs, dy, dx, conf
+
+
+ys, xs, dy, dx, conf = block_shift(crest_flat, lips, 128, 64, 40)
+print("blocks", dx.size, "median NCC", round(float(np.median(conf)), 3), "share NCC>0.5", round(float((conf > 0.5).mean()), 3))
+print("shift dx median", np.median(dx), "p10/p90", np.percentile(dx, [10, 90]), "dy median", np.median(dy), "p10/p90", np.percentile(dy, [10, 90]))
+good = conf > 0.45
+print("in confident blocks: dx", np.round(np.percentile(dx[good], [10, 50, 90]), 1), "dy", np.round(np.percentile(dy[good], [10, 50, 90]), 1), "count", int(good.sum()))
+np.save(ROOT + "fit/block_shift.npy", np.stack([dy, dx, conf]))
+json.dump({"ys": ys, "xs": xs}, open(ROOT + "fit/block_grid.json", "w"))
+# Overlay for the eye: height lips in red over the flat. FR : superposition pour l'œil, lèvres de la height en rouge sur la base color.
+ov = flat.copy()
+m = np.clip((lips - np.quantile(lips, 0.93)) / (np.quantile(lips, 0.995) - np.quantile(lips, 0.93)), 0, 1)
+ov[..., 0] = ov[..., 0] * (1 - m) + m
+ov[..., 1] = ov[..., 1] * (1 - m)
+ov[..., 2] = ov[..., 2] * (1 - m)
+Image.fromarray((ov * 255).astype(np.uint8)).save(ROOT + "fit/overlay_height_on_flat.png")

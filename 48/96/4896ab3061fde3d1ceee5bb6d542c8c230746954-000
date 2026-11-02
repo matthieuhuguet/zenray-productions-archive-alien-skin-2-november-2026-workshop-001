@@ -1,0 +1,57 @@
+# 2 November 2026 : checks the film on its own frames. Each frame is a film frame from 1. Colour changes must keep the relief on the same pixels, and the colours must come in the validated order. Prints a contact sheet.
+# Usage : python -I CheckFilm.py <frames dir> <sheet.png>. FR : contrôle le film sur ses images : le relief reste aux mêmes pixels, les couleurs viennent dans l'ordre validé.
+import json
+import sys
+
+import numpy as np
+from PIL import Image
+
+D, SHEET = sys.argv[1], sys.argv[2]
+rgb = lambda f: np.asarray(Image.open(f"{D}/ad_{f:04d}.png").convert("RGB"), np.float64) / 255.0
+
+
+def edges(a):
+    g = a.mean(2)
+    gy, gx = np.gradient(g)
+    return np.hypot(gx, gy)
+
+
+def corr(a, b):
+    return float(np.corrcoef(a.ravel(), b.ravel())[0, 1])
+
+
+def relief(f0, f1):
+    return round(corr(edges(rgb(f0)), edges(rgb(f1))), 3)
+
+
+def hue(f):
+    m = rgb(f).reshape(-1, 3).mean(0)
+    return [round(float(x), 3) for x in m], "warm" if m[0] - m[1] > 0.06 else ("olive" if m[0] - m[2] > 0.08 else "grey")
+
+
+report = {}
+# Sphere cuts at film frames 41 and 81 (camera index 40 and 80). FR : coupes de sphères.
+report["shot1"] = {f: hue(f) for f in (20, 60, 100)}
+report["shot2"] = hue(180)
+# Orbit : frames 241..384, changes between 288/289 and 336/337. FR : orbite.
+report["orbit_change_1_relief"] = relief(288, 289)
+report["orbit_change_2_relief"] = relief(336, 337)
+report["orbit_same_colour_control"] = relief(280, 281)
+report["orbit_colours"] = [hue(f) for f in (264, 312, 360)]
+# Zoom from above : frames 385..528, colour changes between 432/433 and 480/481, same pose on each side. FR : zoom vu de dessus, même pose de part et d'autre des changements.
+report["zoom_change_1_relief"] = relief(432, 433)
+report["zoom_change_2_relief"] = relief(480, 481)
+report["zoom_same_colour_control"] = relief(430, 431)
+report["zoom_colours"] = [hue(f) for f in (408, 456, 504)]
+# The picture at the far end must show twice as much surface as at the near end: same axis, no drift. FR : même axe, sans dérive.
+report["zoom_scale_check"] = "near frames 385, 480, far frames 432, 528"
+report["trio"] = hue(588)
+print(json.dumps(report, indent=0))
+fr = (1, 60, 110, 121, 180, 240, 264, 312, 360, 385, 408, 432, 433, 456, 480, 481, 504, 528, 529, 588, 648)
+s = 256
+cols = 7
+rows = (len(fr) + cols - 1) // cols
+out = Image.new("RGB", (cols * (s + 6), rows * (s + 6)), (16, 16, 14))
+for i, f in enumerate(fr):
+    out.paste(Image.open(f"{D}/ad_{f:04d}.png").convert("RGB").resize((s, s), Image.LANCZOS), ((i % cols) * (s + 6), (i // cols) * (s + 6)))
+out.save(SHEET)

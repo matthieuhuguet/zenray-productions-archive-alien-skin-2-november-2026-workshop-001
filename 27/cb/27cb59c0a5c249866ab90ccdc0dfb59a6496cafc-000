@@ -1,0 +1,9 @@
+ue_ad_render.py 2 s OK
+render started {'start': 1, 'end': 720, 'res': 1024, 'spatial': 1, 'temporal': 1, 'warmup': 16, 'out': '/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_preview', 'cvars': {}}
+
+120 frames 8 s
+240 frames 14 s
+600 frames 36 s
+720 frames 44 s
+720 frames 46 s
+film /Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_ad_preview_1024.mp4 63.7 MB

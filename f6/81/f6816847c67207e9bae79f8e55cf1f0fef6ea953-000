@@ -1,0 +1,49 @@
+# 2 November 2026 : the flat colour only. Reference against reproduction, per channel and per band, plus the side by side the eye checks.
+# FR : la couleur plate seule ; référence contre reproduction, par canal et par bande, plus le côte à côte que l'œil contrôle.
+# Usage : python -I FlatScore.py <reproduction.png> <sheet.png>
+import json
+import sys
+
+import numpy as np
+from PIL import Image
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+
+
+def blur(a, s):
+    fy = np.fft.fftfreq(a.shape[0])[:, None]
+    fx = np.fft.rfftfreq(a.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * (np.pi * s) ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def load(p):
+    return np.asarray(Image.open(p).convert("RGB"), np.float64) / 255.0
+
+
+def score(rep, ref, v):
+    c = lambda x, y: round(float(np.corrcoef(x[v], y[v])[0, 1]), 5)
+    out = {"channels": [c(rep[..., i], ref[..., i]) for i in range(3)], "lum": c(rep.mean(2), ref.mean(2)), "mae": round(float(np.abs(rep - ref)[v].mean()), 5)}
+    la, lb = rep.mean(2), ref.mean(2)
+    out["bands_lum"] = {n: c(blur(la, l) - blur(la, h), blur(lb, l) - blur(lb, h)) for n, l, h in (("broad", 16, 64), ("mid", 4, 16), ("fine", 1, 4))}
+    ca, cb = rep[..., 1] - rep.mean(2), ref[..., 1] - ref.mean(2)
+    out["green_chroma"] = c(ca, cb)
+    out["residual_std"] = [round(float((rep - ref)[..., i][v].std()), 5) for i in range(3)]
+    return out
+
+
+if __name__ == "__main__":
+    rep = load(sys.argv[1])
+    ref = load(A + "refs/flat_aligned_2048.png")
+    v = np.asarray(Image.open(A + "refs/valid_aligned_2048.png").convert("L"), np.float64) > 127
+    print(json.dumps(score(rep, ref, v)))
+    if len(sys.argv) > 2:
+        to8 = lambda a: Image.fromarray((np.clip(a, 0, 1) * 255).round().astype(np.uint8))
+        s = 900
+        whole = Image.new("RGB", (s * 2 + 12, s * 2 + 12), (20, 20, 20))
+        whole.paste(to8(ref).resize((s, s), Image.LANCZOS), (0, 0))
+        whole.paste(to8(rep).resize((s, s), Image.LANCZOS), (s + 12, 0))
+        y, x = 620, 760
+        n = 450
+        whole.paste(to8(ref[y:y + n, x:x + n]).resize((s, s), Image.BICUBIC), (0, s + 12))
+        whole.paste(to8(rep[y:y + n, x:x + n]).resize((s, s), Image.BICUBIC), (s + 12, s + 12))
+        whole.save(sys.argv[2])

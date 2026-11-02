@@ -1,0 +1,110 @@
+# 2 November 2026 : the flat base color and the lit render share one layout, but it is displaced from the height by up to about 50 pixels at 2048. A smooth field, measured coarse to
+# fine by block matching between the crest lines of the flat image and the lips of the height, brings both images onto the height. Parameters in P.
+# FR : base color plate et rendu éclairé partagent une disposition décalée de la height ; un champ lisse, mesuré du grossier au fin, les ramène sur la height.
+import json
+import os
+import sys
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+ROOT = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+PROJECT = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/"
+P = {
+    "levels": ((128, 64, 40, 0.40, 2.0), (64, 32, 14, 0.45, 1.5), (40, 20, 7, 0.45, 1.2), (24, 12, 4, 0.50, 1.0)),  # block, step, search, min NCC, field smoothing (grid cells)
+    "work": 1024,
+    "out": 2048,
+}
+W = P["work"]
+load = lambda p, s: np.asarray(Image.open(p).convert("RGB").resize((s, s), Image.LANCZOS), np.float64) / 255.0
+flat_src, lit_src = ROOT + "Sources/reference_flat_basecolor.webp", ROOT + "Sources/reference_lit.webp"
+flat = load(flat_src, W)
+hf = np.asarray(Image.open(PROJECT + "versions/final/AlienSkinRef_H2/FINAL_height_untiled.png"), np.float64) / 65535.0
+h = np.asarray(Image.fromarray(hf.astype(np.float32), "F").resize((W, W), Image.BICUBIC), np.float64)
+crest = ndi.gaussian_filter(flat[..., 0] - flat[..., 1], 1.2)
+lips = ndi.gaussian_filter(h, 1.2) - ndi.gaussian_filter(h, 8)
+grid_rows, grid_cols = np.mgrid[0:W, 0:W].astype(np.float64)
+
+
+def warp(a, fy, fx, order=1):
+    return ndi.map_coordinates(a, [grid_rows - fy, grid_cols - fx], order=order, mode="nearest")
+
+
+def match(a, b, size, step, search):
+    win = np.outer(np.hanning(size), np.hanning(size))
+    half = size // 2
+    ys = np.arange(half + search, W - half - search + 1, step)
+    xs = np.arange(half + search, W - half - search + 1, step)
+    dy, dx, conf = (np.zeros((len(ys), len(xs))) for _ in range(3))
+    for i, y in enumerate(ys):
+        for j, x in enumerate(xs):
+            A = a[y - half:y + half, x - half:x + half]
+            A = (A - A.mean()) * win
+            big = b[y - half - search:y + half + search, x - half - search:x + half + search]
+            f = np.fft.ifft2(np.fft.fft2(big) * np.conj(np.fft.fft2(A, s=big.shape))).real
+            sub = f[:2 * search + 1, :2 * search + 1]
+            py, px = np.unravel_index(int(np.argmax(sub)), sub.shape)
+            B = big[py:py + size, px:px + size]
+            B = (B - B.mean()) * win
+            conf[i, j] = float((A * B).sum() / (np.sqrt((A ** 2).sum() * (B ** 2).sum()) + 1e-9))
+            dy[i, j], dx[i, j] = py - search, px - search
+    return ys, xs, dy, dx, conf
+
+
+def densify(ys, xs, d, conf, thr, sigma):
+    """Confident blocks only, spread and smoothed by normalised convolution, then up to full resolution."""
+    # FR : seulement les blocs sûrs, étalés et lissés par convolution normalisée, puis pleine résolution.
+    wgt = (conf > thr).astype(np.float64) * np.clip(conf, 0, 1)
+    med = ndi.median_filter(d, size=3, mode="nearest")
+    wgt = wgt * (np.abs(d - med) <= 6)
+    num = ndi.gaussian_filter(d * wgt, sigma, mode="nearest")
+    den = ndi.gaussian_filter(wgt, sigma, mode="nearest")
+    fill = num / np.maximum(den, 1e-4)
+    rows = np.clip((np.arange(W) - ys[0]) / (ys[1] - ys[0]), 0, len(ys) - 1)
+    cols = np.clip((np.arange(W) - xs[0]) / (xs[1] - xs[0]), 0, len(xs) - 1)
+    rr, cc = np.meshgrid(rows, cols, indexing="ij")
+    return ndi.map_coordinates(fill, [rr, cc], order=1, mode="nearest")
+
+
+fy, fx = np.zeros((W, W)), np.zeros((W, W))
+log = []
+ncc = lambda a, b: round(float(np.corrcoef(a.ravel(), b.ravel())[0, 1]), 4)
+print("start crest vs lips", ncc(crest, lips), flush=True)
+for size, step, search, thr, sigma in P["levels"]:
+    cur = warp(crest, fy, fx)
+    ys, xs, dy, dx, conf = match(lips, cur, size, step, search)
+    # dy, dx : where the feature of the height is found in the current flat ; the field grows by that much
+    uy = densify(ys, xs, dy, conf, thr, sigma)
+    ux = densify(ys, xs, dx, conf, thr, sigma)
+    # Compose : new position read through the previous field. FR : composition, la nouvelle position lue à travers le champ précédent.
+    fy2 = -uy + ndi.map_coordinates(fy, [grid_rows + uy, grid_cols + ux], order=1, mode="nearest")
+    fx2 = -ux + ndi.map_coordinates(fx, [grid_rows + uy, grid_cols + ux], order=1, mode="nearest")
+    fy, fx = fy2, fx2
+    after = warp(crest, fy, fx)
+    row = {"block": size, "median_ncc": round(float(np.median(conf)), 3), "corr_after": ncc(after, lips), "max_field": round(float(np.hypot(fy, fx).max()), 1)}
+    log.append(row)
+    print(row, flush=True)
+scale = P["out"] / W
+up = lambda a: np.asarray(Image.fromarray(a.astype(np.float32), "F").resize((P["out"], P["out"]), Image.BICUBIC), np.float64) * scale
+FY, FX = up(fy), up(fx)
+rr, cc = np.mgrid[0:P["out"], 0:P["out"]].astype(np.float64)
+os.makedirs(ROOT + "refs", exist_ok=True)
+for name, src in (("flat", flat_src), ("lit", lit_src)):
+    im = load(src, P["out"])
+    # Past the edge of the source there is no data: a mirror keeps the grain, and the valid mask below keeps those pixels out of every measure.
+    # FR : au-delà du bord de la source il n'y a pas de donnée ; un miroir garde le grain et le masque valide écarte ces pixels des mesures.
+    out = np.dstack([ndi.map_coordinates(im[..., c], [rr - FY, cc - FX], order=3, mode="mirror") for c in range(3)])
+    Image.fromarray((np.clip(out, 0, 1) * 255).round().astype(np.uint8)).save(ROOT + f"refs/{name}_aligned_2048.png")
+inside = ((rr - FY) >= 0) & ((rr - FY) <= P["out"] - 1) & ((cc - FX) >= 0) & ((cc - FX) <= P["out"] - 1)
+Image.fromarray((inside * 255).astype(np.uint8)).save(ROOT + "refs/valid_aligned_2048.png")
+print("valid share", round(float(inside.mean()), 4))
+np.savez_compressed(ROOT + "refs/align_field.npz", fy=FY.astype(np.float32), fx=FX.astype(np.float32))
+json.dump({"params": {k: v for k, v in P.items()}, "log": log}, open(ROOT + "refs/align_log.json", "w"), indent=1)
+aligned = np.asarray(Image.open(ROOT + "refs/flat_aligned_2048.png").resize((W, W), Image.LANCZOS), np.float64) / 255.0
+m = np.clip((lips - np.quantile(lips, 0.93)) / (np.quantile(lips, 0.995) - np.quantile(lips, 0.93)), 0, 1)
+ov = aligned.copy()
+ov[..., 0] = ov[..., 0] * (1 - m) + m
+ov[..., 1] = ov[..., 1] * (1 - m)
+ov[..., 2] = ov[..., 2] * (1 - m)
+Image.fromarray((ov * 255).astype(np.uint8)).save(ROOT + "fit/overlay_after_alignment.png")

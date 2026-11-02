@@ -1,0 +1,18 @@
+[Octane]      Octane Render for Houdini. Build 2026.5.0.0 (Build date: Sep 21 2026 10:21:52)
+[Octane] Octane API: 2026.5
+[Octane] HDK API: 22.0.368
+[Octane] Houdini host version: 22.0.368
+[Octane] Initializing Octane API
+[Octane] Octane API ready. Initialization time: 1.216 seconds
+[Octane] OCIO configuration ready. Initialization time: 0.008 seconds
+[Octane] Octane network rendering enabled. Initialization time: 0.000 seconds
+[Octane] WARNING: preferences file not found: /Users/zenray/Library/Preferences/houdini/22.0/octane.pref
+[Octane] 21:22:31 INFOR: [nodes] -------------  Registering Octane VOP nodes
+[Octane] 21:22:31 INFOR: [nodes] -------------  Octane VOP nodes registered
+[Octane] 21:22:31 INFOR: [nodes] -------------  Registering the plugin custom VOP nodes
+[Octane] 21:22:31 INFOR: [nodes] -------------  Plugin custom VOP nodes registered
+SM_AlienSkin_Plane prims 1048576 points 1050625 bbox [4.0, 0.093, 4.0] fbx MB 335.1
+SM_AlienSkin_Sphere prims 1179648 points 1178114 bbox [2.168, 2.101, 2.17] fbx MB 446.3
+[Octane] 21:22:47 INFOR: [render] ------------   - Cleaning the scene. Full clean state 1
+[Octane] 21:22:47 INFOR: [render] ------------   - Scene including 0 items cleaned. 0 items deleted. 0 remaing items.
+[Octane] 21:22:47 INFOR: [api] ---------------  Closing the Octane API

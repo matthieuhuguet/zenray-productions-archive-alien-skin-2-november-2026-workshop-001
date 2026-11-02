@@ -1,0 +1,71 @@
+# 2 November 2026 : does a colour image really sit on the height? Block by block, the edges of the colour are matched against the edges of the height and the leftover shift is read in pixels at 2048.
+# The unaligned source is the control: it must show the large shifts, otherwise this check proves nothing. FR : la couleur tombe-t-elle sur le relief ? Bloc par bloc, décalage restant en pixels ; la source non recalée sert de témoin.
+import json
+import sys
+
+import numpy as np
+from PIL import Image
+
+BLOCK, STEP, MAX_SHIFT = 256, 128, 96
+
+
+def gray(p, size=2048):
+    im = Image.open(p)
+    a = np.asarray(im, np.float64)
+    a = a / (65535.0 if a.max() > 255 else 255.0)
+    if a.ndim == 3:
+        a = a[..., :3].mean(2)
+    if a.shape[0] != size:
+        a = np.asarray(Image.fromarray(a.astype(np.float32)).resize((size, size), Image.LANCZOS), np.float64)
+    return a
+
+
+def blur(a, s):
+    fy = np.fft.fftfreq(a.shape[0])[:, None]
+    fx = np.fft.rfftfreq(a.shape[1])[None, :]
+    return np.fft.irfft2(np.fft.rfft2(a) * np.exp(-2 * (np.pi * s) ** 2 * (fx ** 2 + fy ** 2)), s=a.shape)
+
+
+def edges(a):
+    b = blur(a, 2.0)
+    gy, gx = np.gradient(b)
+    e = np.hypot(gx, gy)
+    return blur(e, 2.0) - blur(e, 24.0)
+
+
+def shifts(colour, height):
+    ec, eh = edges(colour), edges(height)
+    out = []
+    n = colour.shape[0]
+    win = np.outer(np.hanning(BLOCK), np.hanning(BLOCK))
+    for y in range(0, n - BLOCK + 1, STEP):
+        for x in range(0, n - BLOCK + 1, STEP):
+            a = ec[y:y + BLOCK, x:x + BLOCK] * win
+            b = eh[y:y + BLOCK, x:x + BLOCK] * win
+            cc = np.fft.fftshift(np.fft.irfft2(np.fft.rfft2(a) * np.conj(np.fft.rfft2(b)), s=a.shape))
+            cc /= (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12)
+            c = BLOCK // 2
+            lim = cc[c - MAX_SHIFT:c + MAX_SHIFT + 1, c - MAX_SHIFT:c + MAX_SHIFT + 1]
+            py, px = np.unravel_index(np.argmax(lim), lim.shape)
+            out.append((py - MAX_SHIFT, px - MAX_SHIFT, float(lim.max()), float(cc[c, c])))
+    return np.array(out)
+
+
+def report(name, colour, height):
+    s = shifts(gray(colour), gray(height))
+    m = np.hypot(s[:, 0], s[:, 1])
+    r = {"name": name, "blocks": len(s), "median_px": float(np.median(m)), "p90_px": float(np.percentile(m, 90)), "max_px": float(m.max()), "share_under_4px": round(float((m <= 4).mean()), 3),
+         "edge_match_at_zero": round(float(np.median(s[:, 3])), 3), "edge_match_best": round(float(np.median(s[:, 2])), 3)}
+    print(json.dumps(r), flush=True)
+    return r
+
+
+if __name__ == "__main__":
+    A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+    F = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_H2/"
+    H0, H1 = F + "FINAL_height_untiled.png", F + "FINAL_height.png"
+    report("control: flat source, not aligned", A + "Sources/reference_flat_basecolor.webp", H0)
+    report("flat aligned", A + "refs/flat_aligned_2048.png", H0)
+    report("reproduction, no joint", A + "fit/flat_v1_untiled.png", H0)
+    report("exported BaseColor, seamless, on seamless height", A + "maps_low/T_AlienSkin_BaseColor.png", H1)
+    report("control: reproduction on height shifted by 40 px", A + "fit/flat_v1_untiled.png", A + "fit/_view/_h_shift40.png") if False else None

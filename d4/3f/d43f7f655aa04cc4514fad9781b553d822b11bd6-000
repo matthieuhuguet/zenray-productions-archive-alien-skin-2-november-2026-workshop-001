@@ -1,0 +1,4 @@
+{'nodes': 106, 'errors': {}}
+snake maps {'ok': True, 'errors': {}, 'normal': 0.15000000000000002} 4 s
+snake render 30 s
+done

@@ -1,0 +1,31 @@
+# 2 November 2026 : what HeightToBaseColor.py leaves is the finest lines. That rest goes through the height method (Execute.py, plans L3 then L5), measured in the same seamless space as the height, then added in the graph.
+# FR : ce que HeightToBaseColor.py laisse, ce sont les lignes les plus fines ; ce reste passe par la méthode height, dans le même espace seamless, puis s'ajoute dans le graphe.
+import os
+import sys
+
+P = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef"
+os.environ["ZRH_WORK"] = P
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import numpy as np
+from PIL import Image
+import Execute as EX
+import RunPasses as RP
+
+GAIN = 2.0   # the rest is small: stored at twice its size around 0.5. FR : stocké à deux fois sa taille autour de 0,5.
+
+if __name__ == "__main__":
+    A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/refs/"
+    ref = np.asarray(Image.open(A + "flat_on_height_seamless_2048.png").convert("RGB"), np.float64) / 255.0
+    bc = np.asarray(Image.open(P + "/versions/final/AlienSkinRef_HBC/FINAL_basecolor.png").convert("RGB"), np.float64) / 255.0
+    rest = (ref - bc).mean(2)
+    t = np.clip(0.5 + GAIN * rest, 0, 1)
+    print("rest std", round(float(rest.std()), 4), "clipped share", round(float(((t <= 0) | (t >= 1)).mean()), 4), flush=True)
+    target = A + "flat_lines_target_2048.png"
+    Image.fromarray((t * 65535).round().astype(np.uint16)).save(target)
+    valid = A + "valid_on_height_seamless_2048.png"
+    final_dir = P + "/versions/final"
+    net = "/obj/ZRH_AlienSkinRef_Lines"
+    h1, h2 = final_dir + "/AlienSkinRef_Lines_H1", final_dir + "/AlienSkinRef_Lines_H2"
+    EX.run("AlienSkinRef_Lines_H1", net, target, valid, plan=RP.plan_for("L3"), min_gain=0.001)
+    EX.run("AlienSkinRef_Lines_H2", net, target, valid, plan=RP.plan_for("L5"), min_gain=0.0005, resume=h1)
+    print("done", flush=True)

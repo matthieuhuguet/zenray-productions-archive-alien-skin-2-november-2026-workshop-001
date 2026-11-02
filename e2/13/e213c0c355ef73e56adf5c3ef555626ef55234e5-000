@@ -1,0 +1,44 @@
+# 2 November 2026 : the colour regions keep the colours but lose the fine lines of the skin. What is left (reference minus regions, as luminance) goes through the height method of ZenRay Height
+# (Execute.py, plans L3 then L5), which is made for fine relief, and gets the same seamless layer so that it stays aligned with the height and the base color.
+# FR : les régions gardent les couleurs mais perdent les lignes fines de la peau ; le reste passe par la méthode height, avec la même couche seamless.
+import json
+import os
+import sys
+
+P = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef"
+os.environ["ZRH_WORK"] = P
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import numpy as np
+from PIL import Image
+import Execute as EX
+import RunPasses as RP
+
+
+
+if __name__ == "__main__":
+    A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/refs/"
+    GAIN = 2.0   # the residual is small: it is stored at twice its size around 0.5
+    BC = P + "/versions/final/AlienSkinRef_BC/L07_colours_k48_2048.png"
+    ref = np.asarray(Image.open(A + "flat_aligned_2048.png").convert("RGB"), np.float64) / 255.0
+    bc = np.asarray(Image.open(BC).convert("RGB"), np.float64) / 255.0
+    res = np.clip(0.5 + GAIN * (ref - bc).mean(2), 0, 1)
+    target = A + "flat_detail_target_2048.png"
+    Image.fromarray((res * 65535).round().astype(np.uint16)).save(target)
+    print("residual std", round(float((ref - bc).mean(2).std()), 4), "clipped share", round(float(((res <= 0) | (res >= 1)).mean()), 4), flush=True)
+    net = "/obj/ZRH_AlienSkinRef_BCd"
+    valid = A + "valid_aligned_2048.png"
+    final_dir = P + "/versions/final"
+    h1, h2 = final_dir + "/AlienSkinRef_BCd_H1", final_dir + "/AlienSkinRef_BCd_H2"
+    EX.run("AlienSkinRef_BCd_H1", net, target, valid, plan=RP.plan_for("L3"), min_gain=0.001)
+    EX.run("AlienSkinRef_BCd_H2", net, target, valid, plan=RP.plan_for("L5"), min_gain=0.0005, resume=h1)
+    seam = json.load(open(P + "/versions/final/AlienSkinRef_H2/recipe_current.json"))[-1]
+    recipe = [L for L in json.load(open(h2 + "/recipe_current.json")) if L.get("type") not in ("seam", "seamless", "lattice")]
+    log = json.load(open(h2 + "/log.json"))
+    cells = log.get("cells", [1, 1])
+    lattice = {"type": "lattice", "cx": int(cells[0]), "cy": int(cells[1])}
+    fin = h2 + "/FINAL_height.png"
+    import shutil
+    shutil.copy(fin, h2 + "/FINAL_height_untiled.png")
+    b = EX.build_final(net, [lattice] + recipe + [dict(seam, tag=seam["tag"] + "_detail")], fin, 2048)
+    print("seamless on detail", b.get("ok"), (b.get("result") or {}).get("errors"), flush=True)
+    print("done", flush=True)

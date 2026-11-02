@@ -1,0 +1,10 @@
+STEP 1/5 features | 5 relief features of /obj/ZRH_AlienSkinRef/OUT_height, 1.1 s
+STEP 2/5 reference | AI base color read through the existing remap, 98.7 % island pixels
+STEP 3/5 gradient maps | islands Delta E 11.9383, luminance r 0.6769, SSIM 0.484
+STEP 4/5 regions K 8 at 256 | accepted, islands Delta E 8.9411, luminance r 0.7974, 4762 polygons
+STEP 4/5 regions K 12 at 512 | accepted, islands Delta E 6.768, luminance r 0.8646, 24384 polygons
+STEP 4/5 regions K 16 at 1024 | accepted, islands Delta E 4.6269, luminance r 0.9268, 94178 polygons
+STEP 4/5 regions K 24 at 2048 | accepted, islands Delta E 3.7342, luminance r 0.9522, 382343 polygons
+STEP 4/5 regions K 32 at 2048 | accepted, islands Delta E 3.3314, luminance r 0.9629, 438373 polygons
+STEP 4/5 regions K 48 at 2048 | accepted, islands Delta E 3.052, luminance r 0.969, 463998 polygons
+{"islands": {"deltaE76_mean": 3.052, "deltaE76_p90": 6.1236, "deltaE76_blur4_mean": 0.426, "lum_pearson": 0.969, "lum_ssim": 0.8285}, "whole_sheet": {"deltaE76_mean": 3.052, "deltaE76_p90": 6.1236, "deltaE76_blur4_mean": 0.426, "lum_pearson": 0.969, "lum_ssim": 0.8285}, "image": "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_HBC/FINAL_basecolor.png", "seconds": 394.4}

@@ -1,0 +1,13 @@
+#!/bin/zsh
+# 2 November 2026 : the flat generated from the final height, through the same chain as the green one. FR : la flat générée depuis la height finale, par la même chaîne que la verte.
+A=/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026
+W=/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef
+H=/Users/zenray/.claude/skills/zenray-houdini/scripts/height
+PY=/Users/zenray/.venvs/zenray-uv/bin/python
+export ZRH_WORK=$W ZR_BRIDGE_TIMEOUT=900
+set -e
+$PY -I $H/RefineColourOnHeight.py $W/versions/final/AlienSkinRef_H2/FINAL_height.png $A/refs/flat_snake_2048.png $A/refs/snake --coarse
+$PY -I $H/CheckOnRelief.py $A/refs/snake/colour_on_height.png $W/versions/final/AlienSkinRef_H2/FINAL_height.png --control $A/refs/flat_snake_2048.png
+$PY -I $H/HeightToBaseColor.py --reference $A/refs/snake/colour_on_height.png --valid $A/refs/snake/valid_on_height.png --graph /obj/ZRH_AlienSkinRef --out $W/versions/final/AlienSkinRef_HBS --set 'source="OUT_height"' --set 'prefix="HBS_"' --set 'region_levels=[[8,256],[12,512],[16,1024],[24,2048],[32,2048],[48,2048]]'
+$PY -I $H/BaseColorLines.py AlienSkinRef_LinesSnake /obj/ZRH_AlienSkinRef_LinesSnake $A/refs/snake/colour_on_height.png $A/refs/snake/valid_on_height.png $W/versions/final/AlienSkinRef_HBS/FINAL_basecolor.png --work $W
+echo chain done

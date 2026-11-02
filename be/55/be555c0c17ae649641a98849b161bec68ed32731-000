@@ -1,0 +1,13 @@
+ue_ad_assets.py 116 s OK
+textures 12
+SM_AlienSkinPlane origin <Struct 'Vector' (0x8c886056a00) {x: 0.000000, y: 0.000000, z: 1.302983}> extent <Struct 'Vector' (0x8c886056a18) {x: 200.000000, y: 200.000000, z: 4.648013}> triangles 26499
+SM_AlienSkinSphere origin <Struct 'Vector' (0x8c886059b00) {x: 0.000553, y: -0.614624, z: 0.000000}> extent <Struct 'Vector' (0x8c886059b18) {x: 108.418232, y: 108.520882, z: 105.044281}> triangles 25674
+material /Game/ZenRayShards/Materials/AlienSkin/M_AlienSkin
+instances ['snake', 'green', 'red']
+
+ue_ad_level.py 2 s OK
+level built /Game/ZenRayShards/Levels/L_AlienSkinAd actors 34
+
+ue_ad_sequence.py 2 s OK
+sequence /Game/ZenRayShards/Cinematics/LS_AlienSkinAd {'cameras': 6, 'keys': 14040} frames 720
+

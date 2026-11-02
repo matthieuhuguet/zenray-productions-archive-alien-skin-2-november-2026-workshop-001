@@ -1,0 +1,41 @@
+# 2 November 2026 : turns the panel measures into flat colours. The lighting of a panel is one grey number per zone (green panel luminance over flat luminance), so red and grey panels divided by it give
+# the flat colour of each zone. Numpy preview of what the graph will do: colour = luminance * sum(zone weight * zone colour / zone luminance). FR : les mesures des panneaux deviennent des couleurs plates, zone par zone.
+import json
+
+import numpy as np
+from PIL import Image
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+ZONES = {"moss_low": 0.07, "moss_high": 0.16, "lip_low": 0.02, "lip_high": 0.08}
+
+
+def weights(f):
+    R, G, B = f[..., 0], f[..., 1], f[..., 2]
+    moss = np.clip((G - 0.5 * (R + B) - ZONES["moss_low"]) / (ZONES["moss_high"] - ZONES["moss_low"]), 0, 1)
+    lip = np.clip((R - G - ZONES["lip_low"]) / (ZONES["lip_high"] - ZONES["lip_low"]), 0, 1) * (1 - moss)
+    return {"moss": moss, "lip": lip, "stone": 1 - moss - lip}
+
+
+flat = np.asarray(Image.open(A + "refs/flat_on_height_2048.png").convert("RGB"), np.float64) / 255.0
+W = weights(flat)
+L = flat.mean(2)
+panels = json.load(open(A + "refs/colorway_tints.json"))
+out = {"zones": ZONES, "flat_mean": {}, "flat_lum": {}, "colours": {}}
+for z, w in W.items():
+    out["flat_mean"][z] = [round(float((flat[..., c] * w).sum() / w.sum()), 4) for c in range(3)]
+    out["flat_lum"][z] = round(float((L * w).sum() / w.sum()), 4)
+    print(z, "share", round(float(w.mean()), 3), "mean", out["flat_mean"][z])
+for k in ("red", "grey"):
+    out["colours"][k] = {}
+    for z in ("moss", "stone", "lip"):
+        g = panels["green"][z + "_mean_panel"]
+        shade = (sum(g) / 3.0) / out["flat_lum"][z]
+        out["colours"][k][z] = [round(float(min(1.0, x / shade)), 4) for x in panels[k][z + "_mean_panel"]]
+print(json.dumps(out["colours"]))
+json.dump(out, open(A + "refs/colorway_targets.json", "w"), indent=1)
+tiles = [flat]
+for k in ("red", "grey"):
+    T = sum(W[z][..., None] * np.array(out["colours"][k][z]) / out["flat_lum"][z] for z in W)
+    tiles.append(np.clip(L[..., None] * T, 0, 1))
+sheet = np.concatenate([t[::2, ::2] for t in tiles], 1)
+Image.fromarray((sheet * 255).round().astype(np.uint8)).save(A + "fit/_view/colorway_preview.png")

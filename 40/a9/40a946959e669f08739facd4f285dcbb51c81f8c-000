@@ -1,0 +1,146 @@
+# 2 November 2026 : brings the flat colour exactly onto the height. AlignRefsToHeight.py matched crest lines against lips, two different things, which left a bias of several pixels.
+# Here the height predicts the colour (the gradient maps of HeightToBaseColor.py) and the flat is matched against that prediction, like against like, coarse to fine. A level is kept only if the height explains more.
+# FR : amène la couleur plate exactement sur la height ; la height prédit la couleur et la flat est calée sur cette prédiction, du grossier au fin ; un niveau n'est gardé que si la height explique mieux.
+import json
+import sys
+
+sys.path.insert(0, "/Users/zenray/.claude/skills/zenray-houdini/scripts/height")
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+import Seamless as S
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+HU = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_H2/FINAL_height_untiled.png"
+HS = "/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_H2/FINAL_height.png"
+BANDS = [2.0, 6.0, 16.0, 48.0]
+BINS, RANGE, ITERS = 64, 0.3, 5
+LEVELS = ((128, 64, 24), (64, 32, 12), (48, 24, 6), (32, 16, 4), (24, 12, 3))   # block, step, reach, pixels at 2048
+BAND = (1.5, 16.0)                                                               # what the matching looks at, Gaussian sigmas
+
+
+def load16(p):
+    a = np.asarray(Image.open(p), np.float64)
+    return a / (65535.0 if a.max() > 255 else 255.0)
+
+
+def features(h):
+    fs = [h]
+    for s in BANDS:
+        fs.append(np.clip((h - ndi.gaussian_filter(h, s / 2.0, mode="wrap") + RANGE) / (2 * RANGE), 0, 1))
+    return [np.clip(np.round(f * (BINS - 1)).astype(np.int64), 0, BINS - 1) for f in fs]
+
+
+def fit(bins, ref, mask):
+    """The additive gradient maps: returns the colour the height predicts everywhere and the luminance correlation on the mask."""
+    idx = [b[mask] for b in bins]
+    R = ref[mask]
+    base = R.mean(0)
+    pred = np.tile(base, (R.shape[0], 1))
+    T = [np.zeros((BINS, 3)) for _ in idx]
+    for _ in range(ITERS):
+        for k, b in enumerate(idx):
+            pred -= T[k][b]
+            res = R - pred
+            cnt = np.maximum(np.bincount(b, minlength=BINS), 1)[:, None]
+            T[k] = np.stack([np.bincount(b, res[:, c], minlength=BINS) for c in range(3)], 1) / cnt
+            pred += T[k][b]
+    full = base + sum(t[b] for t, b in zip(T, bins))
+    return full, float(np.corrcoef(pred.mean(1), R.mean(1))[0, 1])
+
+
+def band(a):
+    return ndi.gaussian_filter(a, BAND[0], mode="wrap") - ndi.gaussian_filter(a, BAND[1], mode="wrap")
+
+
+def match(pred, ref, valid, block, step, reach):
+    """Local shift of the reference that best meets the prediction, as a smooth field in pixels (dy, dx) to add to the sampling positions."""
+    n = ref.shape[0]
+    win = np.outer(np.hanning(block), np.hanning(block))
+    ys = list(range(0, n - block + 1, step))
+    xs = list(range(0, n - block + 1, step))
+    gy, gx, gw = (np.zeros((len(ys), len(xs))) for _ in range(3))
+    for i, y in enumerate(ys):
+        for j, x in enumerate(xs):
+            if valid[y:y + block, x:x + block].mean() < 0.9:
+                continue
+            a = pred[y:y + block, x:x + block] * win
+            b = ref[y:y + block, x:x + block] * win
+            cc = np.fft.fftshift(np.fft.irfft2(np.fft.rfft2(a) * np.conj(np.fft.rfft2(b)), s=a.shape)) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12)
+            c = block // 2
+            r = min(reach, c - 2)
+            lim = cc[c - r:c + r + 1, c - r:c + r + 1]
+            py, px = np.unravel_index(np.argmax(lim), lim.shape)
+            v = lim[py, px]
+            sy, sx = float(py - r), float(px - r)
+            if 0 < py < 2 * r and 0 < px < 2 * r:
+                d = lim[py - 1, px] - 2 * v + lim[py + 1, px]
+                sy += 0.5 * (lim[py - 1, px] - lim[py + 1, px]) / d if d < 0 else 0.0
+                d = lim[py, px - 1] - 2 * v + lim[py, px + 1]
+                sx += 0.5 * (lim[py, px - 1] - lim[py, px + 1]) / d if d < 0 else 0.0
+            # The prediction sits at +s relative to the reference, so the reference must be read s pixels earlier. FR : la référence doit être lue s pixels plus tôt.
+            gy[i, j], gx[i, j], gw[i, j] = -sy, -sx, max(0.0, v) ** 2
+    gy, gx = ndi.median_filter(gy, 5), ndi.median_filter(gx, 5)
+    w = ndi.gaussian_filter(gw, 1.5, mode="nearest") + 1e-6
+    gy = ndi.gaussian_filter(gy * gw, 1.5, mode="nearest") / w
+    gx = ndi.gaussian_filter(gx * gw, 1.5, mode="nearest") / w
+    centres_y = np.array(ys) + block / 2.0
+    centres_x = np.array(xs) + block / 2.0
+    py = np.interp(np.arange(n), centres_y, np.arange(len(ys)))
+    px = np.interp(np.arange(n), centres_x, np.arange(len(xs)))
+    grid = np.meshgrid(py, px, indexing="ij")
+    return ndi.map_coordinates(gy, grid, order=1), ndi.map_coordinates(gx, grid, order=1)
+
+
+def warp(img, fy, fx, order=3):
+    n = img.shape[0]
+    rows, cols = np.mgrid[0:n, 0:n].astype(np.float64)
+    pos = [rows + fy, cols + fx]
+    if img.ndim == 2:
+        return ndi.map_coordinates(img, pos, order=order, mode="mirror")
+    return np.stack([ndi.map_coordinates(img[..., c], pos, order=order, mode="mirror") for c in range(img.shape[2])], 2)
+
+
+if __name__ == "__main__":
+    h = load16(HU)
+    bins = features(h)
+    src = np.asarray(Image.open(A + "refs/flat_aligned_2048.png").convert("RGB"), np.float64) / 255.0
+    valid0 = np.asarray(Image.open(A + "refs/valid_aligned_2048.png").convert("L"), np.float64) / 255.0
+    fy, fx = np.zeros(h.shape), np.zeros(h.shape)
+    log = []
+    mask = valid0 > 0.5
+    mask[:32] = mask[-32:] = False
+    mask[:, :32] = mask[:, -32:] = False
+    pred, best = fit(bins, src, mask)
+    print("start", round(best, 4), flush=True)
+    log.append({"level": "start", "explained": best})
+    for block, step, reach in LEVELS:
+        for rnd in range(2):
+            cur = warp(src, fy, fx)
+            pred, score = fit(bins, cur, mask)
+            dy, dx = match(band(pred.mean(2)), band(cur.mean(2)), mask, block, step, reach)
+            ty, tx = fy + dy, fx + dx
+            t = warp(src, ty, tx)
+            _, s2 = fit(bins, t, mask)
+            kept = s2 > best + 1e-4
+            print(block, rnd, "explained", round(s2, 4), "field max", round(float(np.hypot(ty, tx).max()), 1), "median", round(float(np.median(np.hypot(ty, tx))), 2), "kept" if kept else "dropped", flush=True)
+            log.append({"block": block, "round": rnd, "explained": s2, "kept": bool(kept)})
+            if not kept:
+                break
+            fy, fx, best = ty, tx, s2
+    final = warp(src, fy, fx)
+    v = warp(valid0, fy, fx, order=1) > 0.5
+    to8 = lambda a: Image.fromarray((np.clip(a, 0, 1) * 255).round().astype(np.uint8))
+    to8(final).save(A + "refs/flat_on_height_2048.png")
+    to8(v.astype(np.float64)).save(A + "refs/valid_on_height_2048.png")
+    np.savez_compressed(A + "refs/refine_field.npz", fy=fy.astype(np.float32), fx=fx.astype(np.float32))
+    # The same seamless move as the height, so the colour stays on the relief in the repeating version. FR : le même déplacement seamless que la height.
+    pl = S.plan(h)
+    check = float(np.corrcoef(S.apply_plan(h, pl).ravel(), load16(HS).ravel())[0, 1])
+    seam = np.stack([S.apply_plan(final[..., c], pl) for c in range(3)], 2)
+    to8(seam).save(A + "refs/flat_on_height_seamless_2048.png")
+    seam_v = S.apply_plan(v.astype(np.float64), pl) > 0.5
+    to8(seam_v.astype(np.float64)).save(A + "refs/valid_on_height_seamless_2048.png")
+    json.dump({"log": log, "explained": best, "plan_vs_graph_height": check}, open(A + "refs/refine_log.json", "w"), indent=1)
+    print("final explained", round(best, 4), "plan vs graph height", round(check, 5), flush=True)

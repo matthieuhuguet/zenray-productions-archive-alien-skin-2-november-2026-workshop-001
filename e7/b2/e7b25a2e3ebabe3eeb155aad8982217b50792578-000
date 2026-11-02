@@ -1,0 +1,68 @@
+# 2 November 2026 : the three colourways measured on the three lit panels. All panels share one relief and one light, so the ratio of a panel to the green panel, zone by zone, cancels the lighting
+# and leaves the tint. Green is the flat colour itself, so its tints are 1. FR : les trois coloris mesurés sur les panneaux ; le rapport au panneau vert, zone par zone, annule la lumière et laisse la teinte.
+import json
+
+import numpy as np
+from PIL import Image
+from scipy import ndimage as ndi
+
+A = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/"
+im = np.asarray(Image.open(A + "Sources/colourways_3panels.webp").convert("RGB"), np.float64) / 255.0
+print("image", im.shape)
+# Panels found from the dark frame around them. FR : panneaux trouvés depuis le cadre sombre.
+col = im.mean(2).mean(0)
+dark = col < 0.13
+edges = np.flatnonzero(np.diff(dark.astype(int)))
+print("column edges", edges.tolist())
+row = im.mean(2).mean(1)
+redges = np.flatnonzero(np.diff((row < 0.13).astype(int)))
+print("row edges", redges.tolist())
+starts = [e + 1 for e in edges if dark[e]]
+ends = [e for e in edges if not dark[e]]
+print(starts, ends)
+
+PANELS = {"grey": (18, 650), "red": (685, 1316), "green": (1352, 1982)}
+Y0, Y1 = 12, 650
+W = min(b - a for a, b in PANELS.values())
+crop = {k: im[Y0:Y1, a:a + W] for k, (a, b) in PANELS.items()}
+
+
+def shift_to(a, b, reach=16):
+    """Integer shift of b onto a by correlation. FR : décalage entier de b sur a par corrélation."""
+    x = a.mean(2) - ndi.gaussian_filter(a.mean(2), 12)
+    y = b.mean(2) - ndi.gaussian_filter(b.mean(2), 12)
+    cc = np.fft.fftshift(np.fft.irfft2(np.fft.rfft2(x) * np.conj(np.fft.rfft2(y)), s=x.shape))
+    c0, c1 = x.shape[0] // 2, x.shape[1] // 2
+    lim = cc[c0 - reach:c0 + reach + 1, c1 - reach:c1 + reach + 1]
+    py, px = np.unravel_index(np.argmax(lim), lim.shape)
+    return int(py - reach), int(px - reach), float(lim.max() / (np.linalg.norm(x) * np.linalg.norm(y)))
+
+
+for k in ("grey", "red"):
+    sy, sx, q = shift_to(crop["green"], crop[k])
+    print(k, "shift to green", sy, sx, "match", round(q, 3))
+    crop[k] = np.roll(crop[k], (sy, sx), (0, 1))
+
+g = crop["green"]
+lum = g.mean(2)
+R, G, B = g[..., 0], g[..., 1], g[..., 2]
+chroma_g = G - 0.5 * (R + B)
+warm = R - B
+# Zones on the green panel, mid luminance only so that the shadows and the glints do not vote. FR : zones sur le panneau vert, luminance moyenne seulement.
+ok = (lum > np.percentile(lum, 20)) & (lum < np.percentile(lum, 97))
+moss = (chroma_g > 0.035) & ok
+lip = (R > G + 0.01) & (warm > 0.14) & ok
+stone = (~moss) & (~lip) & (np.abs(chroma_g) < 0.02) & (warm < 0.10) & ok
+print("shares moss", round(float(moss.mean()), 3), "lip", round(float(lip.mean()), 3), "stone", round(float(stone.mean()), 3))
+out = {}
+for k in ("grey", "red", "green"):
+    t = {}
+    for name, m in (("moss", moss), ("stone", stone), ("lip", lip)):
+        ratio = [float(np.sum(crop[k][..., c][m]) / np.sum(g[..., c][m])) for c in range(3)]
+        t[name] = [round(x, 3) for x in ratio]
+        t[name + "_mean_panel"] = [round(float(x), 3) for x in crop[k][m].mean(0)]
+    out[k] = t
+print(json.dumps(out, indent=0))
+json.dump(out, open(A + "refs/colorway_tints.json", "w"), indent=1)
+view = np.concatenate([np.stack([moss, stone, lip], 2).astype(np.float64), crop["grey"], crop["red"], crop["green"]], 1)
+Image.fromarray((view * 255).round().astype(np.uint8)).save(A + "fit/_view/colorway_zones.png")
