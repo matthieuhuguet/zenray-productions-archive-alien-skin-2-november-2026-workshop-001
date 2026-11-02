@@ -1,0 +1,33 @@
+{
+ "_note": "2 November 2026, 23:00 : soundtrack of the Alien Skin film. Both tracks start at their own 0 s (Matthieu's correction: the 22:58 version started Nuit sur Lumiere at 3:20, the excerpt of an older montage). Nuit sur Lumiere (Lorien Testard, official upload YoAc7hFAJiI) plays 0 to 8 s, crossfade 2 s centred on 8 s (7 to 9 s), then The Ancient Life (Noriyasu Agematsu, cqyoHlRyS8g) from its 0 s to the end; fade in 1 s, fade out 1 s. Engine: /Users/zenray/.claude/skills/zenray-edit/scripts/score-timeline.py",
+ "duration_from": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_film_preview_1024.mp4",
+ "sample_rate": 48000,
+ "crossfade": 2.0,
+ "fade_in": 1.0,
+ "fade_out": 1.0,
+ "track_lufs": -18,
+ "master_lufs": -14,
+ "true_peak_db": -1.5,
+ "audio_bitrate": "320k",
+ "out_dir": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/soundtrack",
+ "name": "alien_skin_score",
+ "tracks": [
+  {
+   "id": "nuit_sur_lumiere",
+   "file": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/audio_src/Lumiere's Opera - Nuit sur Lumiere - Lorien Testard [YoAc7hFAJiI].wav",
+   "start": 0,
+   "until": 8.0
+  },
+  {
+   "id": "the_ancient_life",
+   "file": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/audio_src/The Ancient Life - Noriyasu Agematsu [cqyoHlRyS8g].wav",
+   "start": 0
+  }
+ ],
+ "mux": [
+  {
+   "video": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_film_preview_1024.mp4",
+   "out": "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_film_preview_1024_music.mp4"
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+# Project workspace (2 November 2026)
+
+- Project ID: alien-skin-2-november-2026. (2 November 2026)
+- Read the global doctrine at /Users/zenray/.claude/CLAUDE.md and use the zenray-assets skill. (2 November 2026)
+- Read canonical feedback: /Users/zenray/.claude/Memory1/Projects/alien-skin-2-november-2026/FEEDBACK.md. Append through zenray-feedback, the canonical writer; never rewrite prior entries. (2 November 2026)
+- Pinned rules, read first: /Users/zenray/.claude/Memory1/Projects/alien-skin-2-november-2026/Rules.md. Add one with feedback.py add alien-skin-2-november-2026 "<rule>" --kind rule. (2 November 2026)
+
+@/Users/zenray/.claude/Memory1/Projects/alien-skin-2-november-2026/Rules.md
+
+- Work in /Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026; keep durable knowledge in /Users/zenray/.claude/Memory1/Projects/alien-skin-2-november-2026. Linked production directories remain in place. (2 November 2026)
+- Assets watches registered sources automatically. A local entry is not proof of verified cloud backup. (2 November 2026)

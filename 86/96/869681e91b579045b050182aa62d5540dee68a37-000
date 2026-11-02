@@ -1,0 +1,26 @@
+# Index du chantier Alien Skin (2 November 2026)
+
+- Racine : `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026` ; projet Assets `alien-skin-2-november-2026` (relié le 2 November 2026 ; méthode dans `zenray-height`) ; feedback `/Users/zenray/.claude/Memory1/Projects/zenray-height/FEEDBACK.md`. Cet index est une porte, le registre reste celui d'Assets. (2 November 2026)
+- Scène : `/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/AlienSkinRef_4_colorways.hiplc`, réseau `/obj/ZRH_AlienSkinRef`, menu HDA Colorway. Height finale : `/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/AlienSkinRef_H2/FINAL_height.png`. (2 November 2026)
+- Couches de couleur : `/Users/zenray/.claude/tmp/tmp-zenray-height/projects/AlienSkinRef/versions/final/` (`AlienSkinRef_HBC`, `AlienSkinRef_Lines_*` pour Green ; `AlienSkinRef_HBS`, `AlienSkinRef_LinesSnake_*` pour Snake). Méthode : `/Users/zenray/.claude/skills/zenray-houdini/Copernicus2.md` section 14.8. (2 November 2026)
+
+| Dossier | Rôle | Fichiers |
+|---|---|---|
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/Sources` | images reçues, sans modification (height, références, flats générées) | 6 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/basecolor` | essais de la couleur procédurale écartée, conservés | 17 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/fit` | scripts propres à ce chantier, journaux et vues de contrôle | 66 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps` | cartes de la couleur procédurale écartée, conservées | 14 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_green` | cartes de Green, base color reproduite depuis la première flat | 10 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_grey` | cartes de Grey, teintes par zone depuis Green | 10 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_high` | ancien essai high, remplacé par le menu Variant | 8 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_low` | ancien essai low, remplacé par le menu Variant | 8 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_mid` | ancien essai mid, remplacé par le menu Variant | 10 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_red` | cartes de Red, teintes par zone depuis Green | 10 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/maps_snake` | cartes de Snake, coloris final (BaseColor, Normal, Height, Roughness, AO, Metallic, ORM, Displace, NormalDetail) | 10 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/refs` | images recalées sur la height, masques, champs de déplacement, cibles ; `refs/snake` pour Snake | 21 |
+| `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render` | rendus Karma et planches ; finaux `skin_snake_vs_ref.png`, `skin_4_colorways.png`, `snake_grid_check.png` | 43 |
+
+- 233 fichiers comptés le 02 November 2026, 20:59 (Europe/Paris). (2 November 2026)
+- Unreal : `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/unreal` (maillages FBX, `alien_ad.json`) ; niveau `/Game/ZenRayShards/Levels/L_AlienSkinAd`, séquence `/Game/ZenRayShards/Cinematics/LS_AlienSkinAd` ; contrôle `render/ue_test_vs_ceramic.png`, aperçu `render/alien_skin_ad_preview_1024.mp4`. (2 November 2026)
+- Film : données `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/unreal/film.json`, aperçu `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/alien_skin_film_preview_1024.mp4`, planche `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/film_sheet.png`, images `/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026/render/ue_preview`. (2 November 2026)
+- Index complet et chronologie : `/Users/zenray/.claude/Memory1/Projects/alien-skin-2-november-2026/Project1.md`. Les dossiers d'images `render/final_4096`, `render/ue_preview`, `render/ue_test` sont exclus de l'archive cloud. (2 November 2026)
