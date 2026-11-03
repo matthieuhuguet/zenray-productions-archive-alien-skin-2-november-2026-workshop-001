@@ -1,0 +1,101 @@
+import os
+import json
+import hashlib
+from datetime import datetime, timezone
+
+PROJECT_ID = "alien-skin-2-november-2026"
+WORKSHOP_DIR = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026"
+MEMORY_DIR = f"/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}"
+ARTICLE_HTML = os.path.join(WORKSHOP_DIR, "Articles", "index.html")
+
+def sha256_file(filepath):
+    h = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
+
+# Read FileInventory.json
+inv_path = os.path.join(MEMORY_DIR, "FileInventory.json")
+with open(inv_path, "r", encoding="utf-8") as f:
+    inventory = json.load(f)
+
+# Ensure Articles/index.html is included in inventory
+article_sha = sha256_file(ARTICLE_HTML)
+article_st = os.stat(ARTICLE_HTML)
+if not any(item["path"] == ARTICLE_HTML for item in inventory):
+    inventory.append({
+        "path": ARTICLE_HTML,
+        "role": "Article et Synthèse",
+        "size": article_st.st_size,
+        "modifiedAt": datetime.fromtimestamp(article_st.st_mtime, tz=timezone.utc).isoformat(),
+        "sha256": article_sha
+    })
+    with open(inv_path, "w", encoding="utf-8") as f:
+        json.dump(inventory, f, indent=2)
+
+# Build ProjectInfo.json
+project_info = {
+    "projectId": PROJECT_ID,
+    "name": "Alien Skin",
+    "entries": [
+        {
+            "id": "revision-1-claude",
+            "createdAt": "2026-11-02T23:05:00+01:00",
+            "sourceDigest": sha256_file(os.path.join(MEMORY_DIR, "Project1.md")),
+            "summary": "Reproduction de la texture procédurale dans Houdini Copernicus (0,99888), module seamless (0,98531), base color Snake calée sur le relief (2,2 px), et film 27s Unreal Engine 5.4 Lumen."
+        },
+        {
+            "id": "revision-2-antigravity",
+            "createdAt": "2026-11-03T02:30:00+01:00",
+            "sourceDigest": article_sha,
+            "summary": "Sound design Kai'Sa -14 LUFS, titrage cinématique Apotek Sombres Complots, safe zones Instagram Reels et YouTube Shorts, extraction 27 captures, 2 planches triptyques 10k ArtStation, synthèse HTML et archivage cloud Assets."
+        }
+    ]
+}
+
+with open(os.path.join(WORKSHOP_DIR, "ProjectInfo.json"), "w", encoding="utf-8") as f:
+    json.dump(project_info, f, indent=2)
+with open(os.path.join(MEMORY_DIR, "ProjectInfo.json"), "w", encoding="utf-8") as f:
+    json.dump(project_info, f, indent=2)
+
+# Build IndexMapping.json
+files_mapping = []
+for item in inventory:
+    lpath = item["path"]
+    rel = os.path.relpath(lpath, WORKSHOP_DIR) if lpath.startswith(WORKSHOP_DIR) else (
+        os.path.relpath(lpath, MEMORY_DIR) if lpath.startswith(MEMORY_DIR) else os.path.basename(lpath)
+    )
+    fid = f"workshop:{rel}" if lpath.startswith(WORKSHOP_DIR) else (
+        f"project-notes:{rel}" if lpath.startswith(MEMORY_DIR) else f"external:{rel}"
+    )
+    files_mapping.append({
+        "fileId": fid,
+        "path": lpath,
+        "relativePath": rel,
+        "role": item["role"],
+        "size": item["size"],
+        "sha256": item["sha256"],
+        "modifiedAt": item["modifiedAt"]
+    })
+
+index_mapping = {
+    "projectId": PROJECT_ID,
+    "name": "Alien Skin",
+    "sourceRoot": WORKSHOP_DIR,
+    "projectNotesRoot": MEMORY_DIR,
+    "articleFileId": "workshop:Articles/index.html",
+    "cloudFolder": f"pages/ZenRayAssets/{PROJECT_ID}/sources/tmp/workshop",
+    "cloudStatus": "Consulter les reçus Assets ; ce document ne certifie pas un envoi.",
+    "files": files_mapping
+}
+
+with open(os.path.join(WORKSHOP_DIR, "IndexMapping.json"), "w", encoding="utf-8") as f:
+    json.dump(index_mapping, f, indent=2)
+with open(os.path.join(MEMORY_DIR, "IndexMapping.json"), "w", encoding="utf-8") as f:
+    json.dump(index_mapping, f, indent=2)
+
+print(f"IndexMapping.json generated with {len(files_mapping)} files")

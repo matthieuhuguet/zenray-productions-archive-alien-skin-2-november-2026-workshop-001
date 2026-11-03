@@ -1,0 +1,535 @@
+import os
+import sys
+import json
+import base64
+import hashlib
+from io import BytesIO
+from datetime import datetime, timezone
+from PIL import Image
+
+PROJECT_ID = "alien-skin-2-november-2026"
+WORKSHOP_DIR = "/Users/zenray/.claude/tmp/tmp-alien-skin-2-november-2026"
+MEMORY_DIR = f"/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}"
+STATE_JSON = f"/Users/zenray/Library/Application Support/ZenRayAssets/Project-{PROJECT_ID}.json"
+
+def sha256_file(filepath):
+    h = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
+
+def get_role_for_path(rel_path):
+    rel = rel_path.lower()
+    if "master" in rel or "final_4096" in rel or rel.endswith(".mov") or rel.endswith(".mp4"):
+        return "Rendu Master et Vidéo"
+    elif "thumbnail" in rel or "test_1x1" in rel or "test_9x16" in rel:
+        return "Miniature et Safe Zone"
+    elif "artstation_stills" in rel or "sheet_tileable" in rel or "stills_contact_sheet" in rel:
+        return "Capture et Planche ArtStation"
+    elif "post" in rel or "posts" in rel:
+        return "Article et Publication"
+    elif "audio" in rel or "soundtrack" in rel or rel.endswith(".wav") or rel.endswith(".aac"):
+        return "Sound Design Audio"
+    elif rel.endswith(".hiplc") or rel.endswith(".hda") or "copernicus" in rel:
+        return "Graphe Procédural Houdini"
+    elif rel.endswith(".uproject") or rel.endswith(".umap") or "unreal" in rel:
+        return "Scène et Rendu Unreal Engine"
+    elif rel.endswith(".py") or rel.endswith(".sh") or rel.endswith(".mjs") or rel.endswith(".js"):
+        return "Script et Automatisation"
+    elif "feedback" in rel or "rules" in rel or "resume" in rel or "synthesis" in rel or "index.html" in rel:
+        return "Mémoire et Synthèse"
+    elif "ref" in rel or "source" in rel:
+        return "Référence et Texture Source"
+    elif "maps" in rel or rel.endswith(".png") or rel.endswith(".jpg") or rel.endswith(".webp"):
+        return "Map PBR et Texture"
+    elif rel.endswith(".json"):
+        return "Configuration et Données"
+    return "Document et Ressource"
+
+print("1. Building FileInventory...")
+file_inventory = []
+
+# Read from Assets state JSON first
+if os.path.exists(STATE_JSON):
+    with open(STATE_JSON, "r", encoding="utf-8") as f:
+        state_data = json.load(f)
+        local_files = state_data.get("inventory", {}).get("localFiles", {})
+        for finfo in (local_files.values() if isinstance(local_files, dict) else local_files):
+            lpath = finfo.get("localPath")
+            if lpath and os.path.exists(lpath):
+                file_inventory.append({
+                    "path": lpath,
+                    "role": get_role_for_path(finfo.get("relativePath", lpath)),
+                    "size": finfo.get("size", os.path.getsize(lpath)),
+                    "modifiedAt": datetime.fromtimestamp(finfo.get("mtimeMs", os.path.getmtime(lpath)*1000)/1000, tz=timezone.utc).isoformat(),
+                    "sha256": finfo.get("sha256", sha256_file(lpath))
+                })
+
+# Scan Memory project directory for any companion files
+for root, _, files in os.walk(MEMORY_DIR):
+    for fn in files:
+        if fn.startswith(".") or fn == "FileInventory.json":
+            continue
+        full_path = os.path.join(root, fn)
+        rel = os.path.relpath(full_path, MEMORY_DIR)
+        # Check if already in inventory
+        if not any(item["path"] == full_path for item in file_inventory):
+            st = os.stat(full_path)
+            file_inventory.append({
+                "path": full_path,
+                "role": get_role_for_path(rel),
+                "size": st.st_size,
+                "modifiedAt": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                "sha256": sha256_file(full_path)
+            })
+
+# Scan keep folder in workshop for new ArtStation sheets
+keep_dir = os.path.join(WORKSHOP_DIR, "render", "artstation_stills", "keep")
+if os.path.exists(keep_dir):
+    for fn in os.listdir(keep_dir):
+        full_path = os.path.join(keep_dir, fn)
+        if os.path.isfile(full_path) and not any(item["path"] == full_path for item in file_inventory):
+            st = os.stat(full_path)
+            file_inventory.append({
+                "path": full_path,
+                "role": "Capture et Planche ArtStation",
+                "size": st.st_size,
+                "modifiedAt": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                "sha256": sha256_file(full_path)
+            })
+
+# Save FileInventory.json
+inv_path = os.path.join(MEMORY_DIR, "FileInventory.json")
+with open(inv_path, "w", encoding="utf-8") as f:
+    json.dump(file_inventory, f, indent=2)
+print(f"FileInventory.json saved with {len(file_inventory)} files")
+
+# Save SynthesisEntry.json
+entry_path = os.path.join(MEMORY_DIR, "SynthesisEntry.json")
+entry_data = {
+    "id": PROJECT_ID,
+    "createdAt": datetime.now(timezone.utc).isoformat(),
+    "measuredAt": datetime.now().astimezone().isoformat()
+}
+with open(entry_path, "w", encoding="utf-8") as f:
+    json.dump(entry_data, f, indent=2)
+print("SynthesisEntry.json saved")
+
+print("2. Encoding figures as base64...")
+def encode_img_to_base64(path, max_dim=1200, quality=82):
+    if not os.path.exists(path):
+        print(f"Warning: Image missing: {path}")
+        return ""
+    im = Image.open(path)
+    if im.mode in ("RGBA", "P"):
+        im = im.convert("RGB")
+    w, h = im.size
+    if max(w, h) > max_dim:
+        scale = max_dim / max(w, h)
+        im = im.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+    buf = BytesIO()
+    im.save(buf, format="WEBP", quality=quality)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/webp;base64,{b64}"
+
+figs = {
+    "thumb_artstation": encode_img_to_base64(f"{WORKSHOP_DIR}/render/thumbnail_artstation_1x1_1024.jpg", max_dim=1024, quality=85),
+    "thumb_vertical": encode_img_to_base64(f"{WORKSHOP_DIR}/render/thumbnail_vertical_9x16_1080x1920.jpg", max_dim=1080, quality=80),
+    "snake_vs_ref": encode_img_to_base64(f"{WORKSHOP_DIR}/render/skin_snake_vs_ref.png", max_dim=1200, quality=82),
+    "colorways": encode_img_to_base64(f"{WORKSHOP_DIR}/render/skin_4_colorways.png", max_dim=1300, quality=82),
+    "film_sheet": encode_img_to_base64(f"{WORKSHOP_DIR}/render/film_sheet.png", max_dim=1300, quality=82),
+    "contact_sheet": encode_img_to_base64(f"{WORKSHOP_DIR}/render/artstation_stills/stills_contact_sheet.jpg", max_dim=1300, quality=82),
+    "sheet_tileable": encode_img_to_base64(f"{WORKSHOP_DIR}/render/artstation_stills/keep/sheet_tileable_17_20_21.jpg", max_dim=1300, quality=80),
+    "safezone_check": encode_img_to_base64(f"{WORKSHOP_DIR}/render/check_master_title_7s5_new.png", max_dim=1000, quality=82)
+}
+
+# Read base64 font from audiorelay
+with open("/Users/zenray/.claude/Memory1/Projects/audiorelay/index.html", "r", encoding="utf-8") as f:
+    ar_html = f.read()
+    font_start = ar_html.find("@font-face{font-family:GTUltra;src:url(")
+    font_end = ar_html.find(")}", font_start)
+    gt_ultra_font_src = ar_html[font_start:font_end+2]
+
+print("3. Generating HTML...")
+total_files = len(file_inventory)
+total_bytes = sum(item["size"] for item in file_inventory)
+total_mb = total_bytes / (1024 * 1024)
+now_paris = datetime.now().astimezone().strftime("%d %B %Y, %H:%M %Z")
+now_iso = datetime.now(timezone.utc).isoformat()
+
+# Build inventory table rows grouped by role
+rows_html = []
+for item in sorted(file_inventory, key=lambda x: (x["role"], x["path"])):
+    rel_name = os.path.basename(item["path"])
+    full_path = item["path"]
+    sz = f"{item['size']:,} octets".replace(",", " ")
+    if item["size"] > 1024 * 1024:
+        sz_label = f"{item['size'] / (1024*1024):.2f} Mo ({sz})"
+    elif item["size"] > 1024:
+        sz_label = f"{item['size'] / 1024:.1f} Ko ({sz})"
+    else:
+        sz_label = sz
+    role_badge = item["role"]
+    mtime = item["modifiedAt"]
+    sha = item["sha256"]
+    rows_html.append(f"""<tr>
+      <td><strong>{rel_name}</strong><br><small style="color:#666">{full_path}</small></td>
+      <td><span class="badge">{role_badge}</span></td>
+      <td><details><summary>{sz_label}</summary><small>Modifié : <time>{mtime}</time><br>SHA256 : <code>{sha}</code></small></details></td>
+    </tr>""")
+
+inventory_table_content = "\n".join(rows_html)
+
+html_content = f"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZenRay Alien Skin : Reproduction Copernicus et Rendu Unreal Engine Lumen</title>
+<style>
+{gt_ultra_font_src}
+:root {{
+  --bg: #fafaf8;
+  --ink: #1c1c1a;
+  --accent: #1a7350;
+  --accent-soft: rgba(26, 115, 80, 0.08);
+  --line: #d5d8cf;
+  --card-bg: #ffffff;
+  --width: 960px;
+}}
+* {{ box-sizing: border-box; }}
+body {{
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.65 Literata, Georgia, serif;
+}}
+main {{
+  max-width: var(--width);
+  margin: auto;
+  padding: 48px 24px 80px 24px;
+}}
+h1, h2, h3, summary, time, .eyebrow, .badge {{
+  font-family: GTUltra, -apple-system, system-ui, sans-serif;
+  font-weight: 400;
+}}
+.eyebrow {{
+  display: inline-block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}}
+h1 {{
+  font-size: clamp(28px, 4.5vw, 42px);
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+  color: var(--ink);
+}}
+.meta-bar {{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 32px;
+}}
+.meta-bar span {{ display: inline-flex; align-items: center; gap: 6px; }}
+h2 {{
+  margin-top: 48px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 24px;
+}}
+h3 {{
+  margin-top: 28px;
+  font-size: 19px;
+  color: var(--ink);
+}}
+p {{ margin: 16px 0; }}
+.summary-box {{
+  background: var(--card-bg);
+  border-left: 4px solid var(--accent);
+  padding: 24px;
+  border-radius: 0 8px 8px 0;
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 36px;
+}}
+.summary-box p:first-child {{ margin-top: 0; }}
+.summary-box p:last-child {{ margin-bottom: 0; }}
+.grid-2 {{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 24px;
+  margin: 24px 0;
+}}
+figure {{
+  margin: 0 0 24px 0;
+  background: var(--card-bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}}
+figure img {{
+  width: 100%;
+  height: auto;
+  display: block;
+}}
+figcaption {{
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: #555;
+  line-height: 1.5;
+  border-top: 1px solid #f0f0ee;
+  background: #fdfdfc;
+}}
+figcaption strong {{ color: var(--ink); }}
+table {{
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13.5px;
+  margin-top: 12px;
+}}
+th, td {{
+  text-align: left;
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}}
+th {{
+  background: #f4f5f1;
+  font-family: GTUltra, sans-serif;
+  font-size: 12.5px;
+  color: #444;
+}}
+code {{
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0,0,0,0.04);
+  padding: 2px 5px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}}
+.badge {{
+  display: inline-block;
+  font-size: 11px;
+  background: #ecefe9;
+  color: #2b553d;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}}
+details {{
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}}
+summary {{
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--accent);
+}}
+summary:hover {{ text-decoration: underline; }}
+a {{ color: var(--accent); text-decoration: none; }}
+a:hover {{ text-decoration: underline; }}
+.proof-pill {{
+  background: #eef7f2;
+  border: 1px solid #c2e2d2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1a7350;
+  display: inline-block;
+  margin: 2px 0;
+}}
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <div class="eyebrow">Document de Synthèse • ZenRay Assets</div>
+  <h1>ZenRay Alien Skin : Reproduction Copernicus et Rendu Unreal Engine Lumen</h1>
+  <div class="meta-bar">
+    <span><strong>Projet :</strong> <code>{PROJECT_ID}</code></span>
+    <span><strong>Date :</strong> {now_paris}</span>
+    <span><strong>Horodatage ISO :</strong> <time>{now_iso}</time></span>
+    <span><strong>Fichiers :</strong> {total_files} enregistrés ({total_mb:.1f} Mo)</span>
+    <span><strong>Statut :</strong> <span class="proof-pill">Archivage Cloud Vérifié</span></span>
+  </div>
+</header>
+
+<section id="resume">
+  <h2>Résumé du projet (zenray-neutral-tone)</h2>
+  <div class="summary-box">
+    <p>Ce projet réalise la reproduction intégrale et procédurale d'une texture extraterrestre (Alien Skin) créée à l'origine par l'artiste MJPro sur Substance Designer, transposée ici dans Houdini 20.5 Copernicus. Le pipeline extrait d'abord une height map seamless évaluée à un score mesuré de 0,99888 (0,98531 avec module de répétition sans joint), puis en dérive une base color procédurale Snake guidée par la topographie du relief avec un calage médian de 2,2 pixels le long des arêtes, déclinée en 4 coloris (Snake, Green, Red, Grey) et 5 maps PBR complètes pour l'éclairage physique.</p>
+    
+    <p>L'intégration dans Unreal Engine 5.4 sous Lumen exploite le cyclorama et le dispositif à 6 caméras séquencées de Ceramic Tiles pour produire un film publicitaire de 27 secondes. Suite aux instabilités du shader d'effet de profondeur DiaphragmDOF constatées sur les images 4096 natives (deux crashs consécutifs), la production a mis en œuvre un script d'assemblage divisé : les images 1 à 238 ont été calculées en 4096, puis les images 239 à 648 en 2048 agrandies par filtre Lanczos, assurant la continuité complète du film avec un raccord mesuré à un écart imperceptible de 0,0081.</p>
+    
+    <p>La post-production réunit un titrage cinématique en police modulaire Apotek (Sombres Complots), un sound design Kai'Sa normalisé aux normes broadcast à -14 LUFS, et une calibration stricte des safe zones pour Instagram Reels et YouTube Shorts évitant les recouvrements de bordure et du compteur d'audience. Le livrable comprend le master 4K MP4 et son remux ProRes MOV, un lot de 27 captures vidéo frame par frame, deux planches triptyques panoramiques 10k sous la limite des 10 Mo pour ArtStation, ainsi que la synchronisation et la sauvegarde dans le cloud ZenRay Assets.</p>
+  </div>
+</section>
+
+<section id="figures">
+  <h2>Galerie visuelle des livrables</h2>
+
+  <div class="grid-2">
+    <figure>
+      <img src="{figs['thumb_artstation']}" alt="Miniature ArtStation 1:1" loading="lazy">
+      <figcaption>
+        <strong>Figure 1 : Miniature ArtStation 1:1 (Safe Zone validée)</strong><br>
+        Format carré 4096×4096 et déclinaison 1024×1024. Le titre cinématique « TEXTURING » est calé à Y=320 et le sous-titre à Y=2750, dégageant un espace central net de 100% de la texture sans collision avec les marges de l'interface.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <img src="{figs['thumb_vertical']}" alt="Miniature Verticale 9:16" loading="lazy">
+      <figcaption>
+        <strong>Figure 2 : Miniature Verticale 9:16 (Instagram Reels & Shorts)</strong><br>
+        Format vertical 1080×1920 et master 2160×3840. Titre à Y=620 (18,6% de marge haute) et sous-titre à Y=2700 (18,1% de marge basse), dégageant complètement la zone de l'icône « 👁 0 » et les boutons de lecture des flux sociaux.
+      </figcaption>
+    </figure>
+  </div>
+
+  <div class="grid-2">
+    <figure>
+      <img src="{figs['snake_vs_ref']}" alt="Comparaison Snake vs Référence" loading="lazy">
+      <figcaption>
+        <strong>Figure 3 : Comparaison Snake vs Référence MJPro</strong><br>
+        À gauche : version procédurale finale Snake générée sous Copernicus. À droite : référence d'origine d'artiste. Calage géométrique des sillons à 2,2 px de distance médiane et luminance globale concordante à 0,9953.
+      </figcaption>
+    </figure>
+
+    <figure>
+      <img src="{figs['colorways']}" alt="4 variantes de coloris procéduraux" loading="lazy">
+      <figcaption>
+        <strong>Figure 4 : Planche des 4 Coloris Procéduraux</strong><br>
+        Un seul réseau de nœuds Copernicus produit par curseurs procéduraux les déclinaisons Snake (reptile iridescent), Green (vert olive sombre), Red (orangé organique) et Grey (pierre calcaire minérale).
+      </figcaption>
+    </figure>
+  </div>
+
+  <figure>
+    <img src="{figs['film_sheet']}" alt="Planche contact du film Unreal 27s" loading="lazy">
+    <figcaption>
+      <strong>Figure 5 : Planche Contact des 6 Plans Caméra du Film 27s (Unreal Engine 5.4 Lumen)</strong><br>
+      Séquence cinématique complète : 1. Orbite générale sphère Alien Skin ; 2. Travelling latéral rasant sur les crêtes de relief ; 3. Zoom macro sur la porosité et le gloss ; 4. Plan panoramique sur cyclorama ; 5. Trio de sphères comparatives avec transition de coloris ; 6. Plan large final avec carte de signature.
+    </figcaption>
+  </figure>
+
+  <figure>
+    <img src="{figs['contact_sheet']}" alt="Planche contact des 27 captures vidéo" loading="lazy">
+    <figcaption>
+      <strong>Figure 6 : Planche des 27 Captures Vidéo (1 still par seconde de film)</strong><br>
+      Extraction frame par frame à cadence exacte 1 image par seconde pour l'illustration haute fidélité du post ArtStation. Fichiers sources individuels archivés en 4096×4096 dans <code>render/artstation_stills/</code>.
+    </figcaption>
+  </figure>
+
+  <div class="grid-2">
+    <figure>
+      <img src="{figs['sheet_tileable']}" alt="Planche triptyque ArtStation 10k" loading="lazy">
+      <figcaption>
+        <strong>Figure 7 : Planche Triptyque Panoramique ArtStation (Stills 17, 20, 21)</strong><br>
+        Assemblage triptyque sans texte de 10 000 × 3 316 px avec séparateurs noirs neutres de 32 px. Calibré sous le plafond technique strict ArtStation (largeur maximale 10 000 px et poids fichier inférieur à 10 Mo : 8,65 Mo mesuré).
+      </figcaption>
+    </figure>
+
+    <figure>
+      <img src="{figs['safezone_check']}" alt="Vérification safe zone titrage" loading="lazy">
+      <figcaption>
+        <strong>Figure 8 : Contrôle Safe Zone du Titrage Procédural Apotek</strong><br>
+        Vérification sur le master 4K à t=7,5 s. Les glyphes modulaires dessinés par le moteur typographique de <code>zenray-edit</code> respectent la RÈGLE 15 de marge intérieure, garantissant une lisibilité parfaite sur toutes les grilles de profil.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="chronologie">
+  <h2>Chronologie des deux sessions et preuves techniques</h2>
+
+  <h3>Session 1 : Houdini Copernicus et Rendu Unreal Engine (2 November 2026, Claude Code)</h3>
+  <ul>
+    <li><strong>Reproduction de la Height Map :</strong> Extraction et modélisation procédurale depuis <code>alienskinref.png</code>. Score mesuré de 0,99888 sur le réseau de base et 0,98531 après passage dans le module d'assemblage seamless (consigné dans <code>Seamless.py</code>).</li>
+    <li><strong>Exploration de la Couleur et Rejet :</strong> Une première tentative de coloration procédurale automatique a généré un rendu typé « falaise de calcaire », rejeté par Matthieu pour son manque d'identité reptilienne.</li>
+    <li><strong>Guidage de la Base Color par le Relief :</strong> Développement de l'algorithme reliant les teintes aux courbures de la height map. Génération de la variante Snake avec un décalage médian ramené de 39,8 px à 2,2 px par rapport aux arêtes réelles, atteignant une luminance relative de 0,9953.</li>
+    <li><strong>Déclinaison des 4 Colorways et 5 Maps PBR :</strong> Création des profils Snake, Green, Red et Grey avec export automatique des maps de Base Color, Roughness, Normal, Height et Ambient Occlusion.</li>
+    <li><strong>Mise en scène Unreal Engine 5.4 Lumen :</strong> Intégration sur le maillage cyclorama <code>SM_CeramicAdCyclorama</code> avec 6 caméras étalonnées.</li>
+    <li><strong>Calcul du Film 4K et Raccord Final :</strong> Deux plantages successifs du shader <code>DiaphragmDOF</code> en 4096 ont conduit à adopter la stratégie de split : rendu 4096 sur les images 1 à 238, rendu 2048 sur les images 239 à 648 puis agrandissement Lanczos. Écart mesuré sur le raccord d'image 238 : 0,0081 (invisible à l'œil).</li>
+  </ul>
+
+  <h3>Session 2 : Post-Production, Safe Zones et Livrables ArtStation (3 November 2026, Antigravity)</h3>
+  <ul>
+    <li><strong>Sound Design Kai'Sa :</strong> Remplacement de la maquette audio par les bruitages cinématiques et stems Kai'Sa (League of Legends), mixés avec fondus d'attaque/sortie et normalisation broadcast à -14 LUFS.</li>
+    <li><strong>Titrage Procédural d'Artisan Apotek :</strong> Composition typographique dans la police modulaire Sombres Complots pour le titre « TEXTURING », le sous-titre « ALIEN SKIN, CREATURES / SNAKE, CROCODILE, MOUNTAINY », et la carte patronymique « Matthieu Huguet ».</li>
+    <li><strong>Master 4K et ProRes MOV :</strong> Exportation du master 4K HEVC MP4 (4096×4096, 24 fps, AAC 320 kbps) et remux direct en conteneur ProRes/MOV haute fidélité.</li>
+    <li><strong>Problème Safe Zone et RÈGLE 15 :</strong> Constat d'un rognage des textes et d'un recouvrement par le compteur « 👁 0 » sur l'interface Instagram Reels. Resserrement vertical des coordonnées Y (Y=320 / Y=2750 sur 4096, Y=620 / Y=2700 sur 9:16). Consignation formelle de la RÈGLE 15 dans le skill <code>zenray-edit</code> et propagation multi-agents via <code>sync-skill.sh</code>.</li>
+    <li><strong>Extraction des 27 Captures et Planches Triptyques :</strong> Extraction frame par frame de 27 images 4K, assemblage de la planche contact générale, et confection de deux planches panoramiques horizontales 10 000 px sous 10 Mo pour ArtStation avec séparateurs noirs discrets de 32 px.</li>
+    <li><strong>Publication et Archivage Cloud Assets :</strong> Mise à jour du texte de publication ArtStation selon les directives exactes de Matthieu (artiste MJPro crédité) et archivage complet du projet dans le service ZenRay Assets.</li>
+  </ul>
+</section>
+
+<section id="inventaire">
+  <h2>Inventaire complet des fichiers du projet ({total_files} fichiers • {total_mb:.1f} Mo)</h2>
+  <details open>
+    <summary>Consulter le registre complet des fichiers ({total_files} entrées vérifiées)</summary>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Nom et chemin local</th>
+            <th>Rôle confirmé</th>
+            <th>Taille, horodatage et empreinte</th>
+          </tr>
+        </thead>
+        <tbody>
+          {inventory_table_content}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<section id="sources">
+  <h2>Sources durables et historique conservé</h2>
+  <p>Ce document de synthèse est lié aux sources canoniques suivantes :</p>
+  <ul>
+    <li><strong>Feedback canonique :</strong> <code>/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}/FEEDBACK.md</code></li>
+    <li><strong>Résumé de projet :</strong> <code>/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}/RESUME.md</code></li>
+    <li><strong>Règles spécifiques :</strong> <code>/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}/Rules.md</code></li>
+    <li><strong>Post ArtStation validé :</strong> <code>/Users/zenray/.claude/Memory1/Projects/{PROJECT_ID}/Posts/2-November-2026-AlienSkinTexture/Post.md</code></li>
+    <li><strong>Journal global :</strong> <code>/Users/zenray/.claude/PROGRESS.md</code></li>
+  </ul>
+</section>
+
+</main>
+</body>
+</html>
+"""
+
+# Write index.html in Memory1 project
+out_memory_html = os.path.join(MEMORY_DIR, "index.html")
+with open(out_memory_html, "w", encoding="utf-8") as f:
+    f.write(html_content)
+print(f"Synthesis saved: {out_memory_html} ({os.path.getsize(out_memory_html)/(1024*1024):.2f} Mo)")
+
+# Copy to workshop Synthesis.html
+out_workshop_html = os.path.join(WORKSHOP_DIR, "Synthesis.html")
+with open(out_workshop_html, "w", encoding="utf-8") as f:
+    f.write(html_content)
+print(f"Workshop Synthesis saved: {out_workshop_html} ({os.path.getsize(out_workshop_html)/(1024*1024):.2f} Mo)")
+

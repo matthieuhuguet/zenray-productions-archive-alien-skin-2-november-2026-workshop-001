@@ -1,0 +1,18 @@
+{
+  "projectId": "alien-skin-2-november-2026",
+  "name": "Alien Skin",
+  "entries": [
+    {
+      "id": "revision-1-claude",
+      "createdAt": "2026-11-02T23:05:00+01:00",
+      "sourceDigest": "245b2216e71b4c4930006b5d021df5f980dcde573ace6df0d2b65a8d1cb963b3",
+      "summary": "Reproduction de la texture proc\u00e9durale dans Houdini Copernicus (0,99888), module seamless (0,98531), base color Snake cal\u00e9e sur le relief (2,2 px), et film 27s Unreal Engine 5.4 Lumen."
+    },
+    {
+      "id": "revision-2-antigravity",
+      "createdAt": "2026-11-03T02:30:00+01:00",
+      "sourceDigest": "ff52ee28671366901b0bb1530e727aebdca8d05afec3309dde69cba4099d4fcc",
+      "summary": "Sound design Kai'Sa -14 LUFS, titrage cin\u00e9matique Apotek Sombres Complots, safe zones Instagram Reels et YouTube Shorts, extraction 27 captures, 2 planches triptyques 10k ArtStation, synth\u00e8se HTML et archivage cloud Assets."
+    }
+  ]
+}
